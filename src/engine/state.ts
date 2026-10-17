@@ -12,7 +12,7 @@ export function initialState(caseId: string): GameState {
     reached: ['expediente'],
     visited: [],
     training: { answers: {}, firstTry: {} },
-    lab: { marks: {}, verdicts: {}, features: [], hypothesis: null, bills: [], lead: null, align: {}, submitted: false },
+    lab: { marks: {}, verdicts: {}, features: [], hypothesis: null, bills: [], lead: null, align: {}, answers: {}, overlay: {}, submitted: false },
     accusation: { answers: {}, submitted: false },
   };
 }

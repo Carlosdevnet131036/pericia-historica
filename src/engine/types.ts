@@ -1,5 +1,6 @@
 import type { FingerprintSpec, PatternType, View } from '../forensics/fingerprint';
 import type { Verdict } from '../forensics/match';
+import type { Landmark } from '../forensics/superimposition';
 import type { WoodSetup } from '../forensics/wood';
 
 export type Step = 'expediente' | 'investigacao' | 'treino' | 'laboratorio' | 'acusacao' | 'revelacao';
@@ -200,7 +201,40 @@ export interface MoneyWoodLab {
   };
 }
 
-export type LabModule = FingerprintLab | PathologyLab | MoneyWoodLab;
+export interface ProfileQuestion extends Question {
+  /** Achados do esqueleto que o jogador usa para responder. */
+  traits: string[];
+}
+
+export interface OverlayCandidate {
+  id: string;
+  name: string;
+  description: string;
+  landmarks: Landmark[];
+}
+
+export interface AnthropologyLab {
+  kind: 'antropologia';
+  title: string;
+  lede: string;
+  profile: {
+    title: string;
+    lede: string;
+    questions: ProfileQuestion[];
+  };
+  overlay: {
+    title: string;
+    lede: string;
+    skull: Landmark[];
+    candidates: OverlayCandidate[];
+    sourceCandidateId: string;
+    /** Erro médio máximo (unidades do rosto) para considerar um encaixe. */
+    threshold: number;
+    explanation: string;
+  };
+}
+
+export type LabModule = FingerprintLab | PathologyLab | MoneyWoodLab | AnthropologyLab;
 
 /* ---------- Caso ---------- */
 
@@ -257,6 +291,9 @@ export interface GameState {
     lead: string | null;
     /** Madeira: posição do trilho em cada tábua candidata. */
     align: Record<string, { offset: number; flip: boolean }>;
+    /** Antropologia: respostas do perfil biológico e ajuste da superposição. */
+    answers: Record<string, string>;
+    overlay: Record<string, { scale: number; dy: number }>;
     submitted: boolean;
   };
   accusation: {

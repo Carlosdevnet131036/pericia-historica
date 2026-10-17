@@ -27,7 +27,7 @@ export function inicio(): HTMLElement {
       h(
         'p',
         { class: 'lede' },
-        'Cada caso é um crime real, encerrado com condenação ou confissão, em que uma técnica forense foi decisiva. Você aprende a técnica, investiga e só no final descobre o que realmente aconteceu, com as fontes.',
+        'Cada caso é real e encerrado, com condenação, confissão ou identificação confirmada, e uma técnica forense foi decisiva. Você aprende a técnica, investiga e só no final descobre o que realmente aconteceu, com as fontes.',
       ),
     ),
     h(

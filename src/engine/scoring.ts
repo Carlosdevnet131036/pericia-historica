@@ -1,6 +1,7 @@
 import { checkMarks, expectedVerdict } from '../forensics/match';
+import { meanError } from '../forensics/superimposition';
 import { compare, isFullMatch } from '../forensics/wood';
-import type { CaseFile, FingerprintLab, GameState, MoneyWoodLab, PathologyLab } from './types';
+import type { AnthropologyLab, CaseFile, FingerprintLab, GameState, MoneyWoodLab, PathologyLab } from './types';
 
 export interface ScoreLine {
   label: string;
@@ -67,6 +68,27 @@ function moneyWoodLabScore(lab: MoneyWoodLab, s: GameState): ScoreLine {
   return { label: 'Cédulas e madeira', points, max };
 }
 
+/**
+ * Antropologia: 1 ponto por pergunta do perfil, 2 por conclusão correta em
+ * cada fotografia e 2 por deixar a superposição encaixada na foto certa.
+ */
+function anthropologyLabScore(lab: AnthropologyLab, s: GameState): ScoreLine {
+  let points = lab.profile.questions.filter((q) => s.lab.answers[q.id] === q.correct).length;
+  let max = lab.profile.questions.length;
+  const { overlay } = lab;
+  for (const cand of overlay.candidates) {
+    const isSource = cand.id === overlay.sourceCandidateId;
+    max += 2;
+    if (s.lab.verdicts[cand.id] === (isSource ? 'identificada' : 'excluida')) points += 2;
+    if (isSource) {
+      max += 2;
+      const o = s.lab.overlay[cand.id];
+      if (o && meanError(overlay.skull, cand.landmarks, o) <= overlay.threshold) points += 2;
+    }
+  }
+  return { label: 'Perfil e superposição', points, max };
+}
+
 export function labScore(c: CaseFile, s: GameState): ScoreLine {
   switch (c.lab.kind) {
     case 'confronto-digital':
@@ -75,6 +97,8 @@ export function labScore(c: CaseFile, s: GameState): ScoreLine {
       return pathologyLabScore(c.lab, s);
     case 'cedulas-madeira':
       return moneyWoodLabScore(c.lab, s);
+    case 'antropologia':
+      return anthropologyLabScore(c.lab, s);
   }
 }
 

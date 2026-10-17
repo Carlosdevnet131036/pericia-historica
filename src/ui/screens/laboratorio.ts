@@ -1,4 +1,5 @@
 import { fingerprintLab } from '../modules/confronto-digital';
+import { anthropologyLab } from '../modules/antropologia';
 import { moneyWoodLab } from '../modules/cedulas-madeira';
 import { pathologyLab } from '../modules/patologia';
 import type { Screen } from './context';
@@ -12,5 +13,7 @@ export const laboratorio: Screen = (ctx) => {
       return pathologyLab(ctx, lab);
     case 'cedulas-madeira':
       return moneyWoodLab(ctx, lab);
+    case 'antropologia':
+      return anthropologyLab(ctx, lab);
   }
 };
