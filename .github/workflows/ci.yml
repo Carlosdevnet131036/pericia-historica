@@ -54,6 +54,30 @@ jobs:
           path: dist/
           retention-days: 7
 
+      - name: Preparar o site para o GitHub Pages
+        if: matrix.node == 22 && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist/
+
+  publicar:
+    name: Publicar no GitHub Pages
+    # Só publica a main, e só depois que testes, build e auditoria passaram.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [verificar, auditoria]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Permissões de escrita só neste job, não no pipeline inteiro.
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4
+
   auditoria:
     name: Auditoria de dependências
     runs-on: ubuntu-latest
