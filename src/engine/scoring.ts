@@ -1,7 +1,8 @@
 import { checkMarks, expectedVerdict } from '../forensics/match';
+import { estimateOviposition } from '../forensics/entomology';
 import { meanError } from '../forensics/superimposition';
 import { compare, isFullMatch } from '../forensics/wood';
-import type { AnthropologyLab, CaseFile, FingerprintLab, GameState, MoneyWoodLab, PathologyLab } from './types';
+import type { AnthropologyLab, CaseFile, EntomologyLab, FingerprintLab, GameState, MoneyWoodLab, PathologyLab } from './types';
 
 export interface ScoreLine {
   label: string;
@@ -89,6 +90,28 @@ function anthropologyLabScore(lab: AnthropologyLab, s: GameState): ScoreLine {
   return { label: 'Perfil e superposição', points, max };
 }
 
+/** Dia de postura que o laboratório espera, calculado a partir dos dados do caso. */
+export function expectedOvipositionDay(lab: EntomologyLab): number {
+  const { larvae } = lab;
+  const stage = larvae.stages.find((x) => x.id === larvae.correctStage);
+  if (!stage) throw new Error(`estágio ${larvae.correctStage} não existe`);
+  return estimateOviposition(larvae.temps, larvae.baseTemp, stage.degreeDays, larvae.lastDay);
+}
+
+/**
+ * Entomologia: 1 ponto pelo estágio da larva, 3 pelo dia de postura, 2 pelo
+ * jornal que aponta a cidade e 2 pela data mínima do embrulho.
+ */
+function entomologyLabScore(lab: EntomologyLab, s: GameState): ScoreLine {
+  const a = s.lab.answers;
+  let points = 0;
+  if (a.estagio === lab.larvae.correctStage) points += 1;
+  if (a.dia === String(expectedOvipositionDay(lab))) points += 3;
+  if (a.jornal === lab.wrapping.leadPaperId) points += 2;
+  if (a.data === lab.wrapping.correctDate) points += 2;
+  return { label: 'Larvas e embrulho', points, max: 8 };
+}
+
 export function labScore(c: CaseFile, s: GameState): ScoreLine {
   switch (c.lab.kind) {
     case 'confronto-digital':
@@ -99,6 +122,8 @@ export function labScore(c: CaseFile, s: GameState): ScoreLine {
       return moneyWoodLabScore(c.lab, s);
     case 'antropologia':
       return anthropologyLabScore(c.lab, s);
+    case 'entomologia':
+      return entomologyLabScore(c.lab, s);
   }
 }
 

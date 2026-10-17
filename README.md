@@ -14,7 +14,7 @@ Jogo de investigação no navegador baseado em **casos criminais reais resolvido
 | 2 | "Brides in the Bath", G. J. Smith (Inglaterra) | 1915 | Patologia forense (Spilsbury) | Jogável |
 | 3 | Sequestro Lindbergh (EUA) | 1932 | Rastreio de cédulas e madeira (Koehler) | Jogável |
 | 4 | A ossada de Embu: Josef Mengele (Brasil) | 1985 | Antropologia forense (Muñoz, Snow, Helmer) | Jogável |
-| 5 | Buck Ruxton (Inglaterra) | 1935 | Entomologia forense | Planejado |
+| 5 | Os embrulhos de Moffat: Buck Ruxton (Escócia/Inglaterra) | 1935 | Entomologia forense (Mearns) | Jogável |
 | 6 | Os Romanov (Rússia) | 1991 | DNA mitocondrial | Planejado |
 | 7 | As ossadas de Perus (Brasil) | 1990 | Antropologia forense e DNA | Planejado |
 | 8 | Unabomber (EUA) | 1996 | Linguística forense | Planejado |
@@ -58,7 +58,8 @@ src/
 │   ├── rojas1892.ts
 │   ├── smith1915.ts
 │   ├── lindbergh1932.ts
-│   └── mengele1985.ts
+│   ├── mengele1985.ts
+│   └── ruxton1935.ts
 ├── engine/             regras independentes de UI
 │   ├── types.ts        contrato de um caso (CaseFile) e do estado (GameState)
 │   ├── state.ts        store imutável + persistência em localStorage
@@ -68,9 +69,10 @@ src/
 │   ├── match.ts        confronto de minúcias
 │   ├── bath.ts         geometria do corpo na banheira
 │   ├── wood.ts         veios, furos de prego e encaixe de tábuas
-│   └── superimposition.ts  superposição crânio-foto
+│   ├── superimposition.ts  superposição crânio-foto
+│   └── entomology.ts   graus-dia acumulados e datação por larvas
 ├── ui/
-│   ├── modules/        uma tela por técnica (datiloscopia, raciocínio, patologia, cédulas e madeira, antropologia)
+│   ├── modules/        uma tela por técnica (datiloscopia, raciocínio, patologia, cédulas e madeira, antropologia, entomologia)
 │   ├── screens/        etapas comuns a todo caso; treino e laboratório despacham por `kind`
 │   ├── view-state.ts   zera o estado de visualização ao trocar de caso
 │   ├── dom.ts          helper h() para criar elementos

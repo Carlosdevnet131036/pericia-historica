@@ -1,5 +1,6 @@
 import type { FingerprintSpec, PatternType, View } from '../forensics/fingerprint';
 import type { Verdict } from '../forensics/match';
+import type { DayTemp } from '../forensics/entomology';
 import type { Landmark } from '../forensics/superimposition';
 import type { WoodSetup } from '../forensics/wood';
 
@@ -234,7 +235,52 @@ export interface AnthropologyLab {
   };
 }
 
-export type LabModule = FingerprintLab | PathologyLab | MoneyWoodLab | AnthropologyLab;
+export interface LarvaStage {
+  id: string;
+  name: string;
+  length: string;
+  /** Graus-dia acumulados desde a postura até atingir este estágio. */
+  degreeDays: number;
+}
+
+export interface Newspaper {
+  id: string;
+  title: string;
+  date: string;
+  distribution: string;
+}
+
+export interface EntomologyLab {
+  kind: 'entomologia';
+  title: string;
+  lede: string;
+  larvae: {
+    title: string;
+    lede: string;
+    measured: string;
+    stages: LarvaStage[];
+    correctStage: string;
+    baseTemp: number;
+    monthLabel: string;
+    /** Último dia de desenvolvimento antes da coleta. */
+    lastDay: number;
+    temps: DayTemp[];
+    explanation: string;
+  };
+  wrapping: {
+    title: string;
+    lede: string;
+    papers: Newspaper[];
+    leadQuestion: string;
+    leadPaperId: string;
+    dateQuestion: string;
+    dateOptions: Option[];
+    correctDate: string;
+    explanation: string;
+  };
+}
+
+export type LabModule = FingerprintLab | PathologyLab | MoneyWoodLab | AnthropologyLab | EntomologyLab;
 
 /* ---------- Caso ---------- */
 
