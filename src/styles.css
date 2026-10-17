@@ -10,6 +10,8 @@
   --blood: #7a2c20;
   --ok: #3d6b42;
   --warn: #9a6a1c;
+  --water: rgb(64 120 170 / 0.38);
+  --water-line: #3d6f9e;
   --font-display: 'Old Standard TT', 'Times New Roman', Georgia, serif;
   --font-body: 'Source Serif 4', Georgia, 'Times New Roman', serif;
   --font-type: 'Courier Prime', 'Courier New', ui-monospace, monospace;
@@ -28,6 +30,8 @@
     --blood: #d77a62;
     --ok: #8cc391;
     --warn: #e0b061;
+    --water: rgb(110 160 210 / 0.35);
+    --water-line: #8fb6dc;
     color-scheme: dark;
   }
 }
@@ -42,6 +46,8 @@
   --blood: #d77a62;
   --ok: #8cc391;
   --warn: #e0b061;
+  --water: rgb(110 160 210 / 0.35);
+  --water-line: #8fb6dc;
   color-scheme: dark;
 }
 
@@ -833,6 +839,246 @@ canvas.print {
   list-style: none;
   display: grid;
   gap: 8px;
+}
+
+/* ---------- Início ---------- */
+
+.brand-name {
+  color: inherit;
+  text-decoration: none;
+}
+
+.case-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+  gap: 16px;
+}
+
+.case-card {
+  height: 100%;
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  background: var(--sheet);
+  border: 1px solid var(--rule);
+  padding: 18px 20px;
+  color: inherit;
+  text-decoration: none;
+}
+
+a.case-card:hover {
+  border-color: var(--ink);
+  box-shadow: inset 4px 0 0 var(--blood);
+}
+
+.case-card.is-locked {
+  opacity: 0.55;
+}
+
+.case-number {
+  font-family: var(--font-type);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--blood);
+}
+
+.case-title {
+  font-family: var(--font-display);
+  font-size: 1.45rem;
+  font-style: italic;
+  line-height: 1.15;
+}
+
+.case-meta,
+.case-tech {
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+}
+
+.case-status {
+  margin-top: 6px;
+  font-family: var(--font-type);
+  font-size: 0.78rem;
+  border-top: 1px dotted var(--rule);
+  padding-top: 8px;
+}
+
+/* ---------- Treino de raciocínio ---------- */
+
+.statement {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.08rem;
+  margin-bottom: 8px;
+}
+
+.chip.is-wrong {
+  border-color: var(--blood);
+  color: var(--blood);
+}
+
+.explanation.is-ok {
+  color: var(--ok);
+}
+
+.explanation.is-wrong {
+  color: var(--blood);
+}
+
+/* ---------- Laboratório de patologia ---------- */
+
+.lab-panel.wide {
+  justify-items: stretch;
+}
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+.pattern-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+.pattern-table th {
+  text-align: left;
+  font-family: var(--font-type);
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  border-bottom: 1px solid var(--rule);
+  padding: 6px 8px;
+}
+
+.pattern-table td {
+  border-bottom: 1px dotted var(--rule);
+  padding: 9px 8px;
+  vertical-align: top;
+}
+
+.pattern-table .center {
+  text-align: center;
+  width: 8rem;
+}
+
+.pattern-table input {
+  width: 1.15rem;
+  height: 1.15rem;
+  accent-color: var(--stamp);
+}
+
+.pattern-table tr.is-correct td:first-child {
+  box-shadow: inset 4px 0 0 var(--ok);
+}
+
+.pattern-table tr.is-wrong td:first-child {
+  box-shadow: inset 4px 0 0 var(--blood);
+}
+
+.row-note {
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  margin-top: 4px;
+}
+
+.found {
+  margin: 0;
+  border-left: 3px solid var(--blood);
+  padding: 4px 0 4px 14px;
+  display: grid;
+  gap: 4px;
+}
+
+.found-label {
+  font-family: var(--font-type);
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--blood);
+}
+
+.measures {
+  font-family: var(--font-type);
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+}
+
+.bath-stage {
+  border: 1px solid var(--rule);
+  background: var(--paper);
+  padding: 8px;
+}
+
+.bath-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 340px;
+}
+
+.bath-wall {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 2.4;
+  stroke-linejoin: round;
+}
+
+.bath-floor {
+  stroke: var(--rule);
+  stroke-width: 1;
+}
+
+.water {
+  fill: var(--water);
+}
+
+.water-line {
+  stroke: var(--water-line);
+  stroke-width: 0.8;
+  stroke-dasharray: 3 2;
+}
+
+.body-limb {
+  stroke: var(--blood);
+  stroke-width: 7;
+  stroke-linecap: round;
+}
+
+.body-head {
+  fill: var(--blood);
+}
+
+.bath-label {
+  font: 4.5px var(--font-type);
+  fill: var(--ink-soft);
+}
+
+.sim-result {
+  display: grid;
+  gap: 10px;
+}
+
+.readout {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 14px;
+  margin: 0;
+  font-family: var(--font-type);
+  font-size: 0.88rem;
+}
+
+.readout dt {
+  color: var(--ink-soft);
+}
+
+.readout dd {
+  margin: 0;
 }
 
 /* ---------- Responsivo ---------- */

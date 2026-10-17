@@ -18,15 +18,15 @@ export const expediente: Screen = ({ caseFile: c, store }) =>
       h('div', { class: 'prose' }, ...c.intro.map((p) => h('p', {}, p)), h('p', { class: 'role' }, c.playerRole)),
       h(
         'aside',
-        { class: 'telegram', 'aria-label': 'Telegrama recebido' },
-        h('p', { class: 'telegram-head' }, 'Telégrafo da Província · Urgente'),
-        h('p', { class: 'telegram-body' }, c.telegram),
+        { class: 'telegram', 'aria-label': 'Documento de abertura do caso' },
+        h('p', { class: 'telegram-head' }, c.dispatch.header),
+        h('p', { class: 'telegram-body' }, c.dispatch.body),
         h('p', { class: 'telegram-foot' }, 'Texto reconstruído para o jogo'),
       ),
     ),
     h(
       'div',
       { class: 'actions' },
-      h('button', { class: 'btn primary', onclick: () => store.goTo('investigacao') }, 'Seguir com Álvarez para Necochea'),
+      h('button', { class: 'btn primary', onclick: () => store.goTo('investigacao') }, c.copy.start),
     ),
   );

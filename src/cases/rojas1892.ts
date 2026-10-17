@@ -13,6 +13,7 @@ export const rojas1892: CaseFile = {
   number: 1,
   title: 'A marca na porta',
   place: 'Necochea, Província de Buenos Aires, Argentina',
+  year: 1892,
   date: 'Junho a julho de 1892',
   technique: 'Datiloscopia (sistema de Vucetich)',
   playerRole:
@@ -22,8 +23,15 @@ export const rojas1892: CaseFile = {
     'Juan Vucetich, um imigrante croata que chefia a seção de estatística da polícia em La Plata, discorda. Ele vem classificando impressões digitais em quatro tipos básicos e treinando alguns policiais no método.',
     'Uma das pessoas treinadas por ele é o inspetor Eduardo Álvarez, enviado agora para um caso parado no litoral sul da província.',
   ],
-  telegram:
-    'NECOCHEA. DOIS FILHOS DE FRANCISCA ROJAS ENCONTRADOS MORTOS EM SEU RANCHO. MÃE FERIDA ACUSA VIZINHO PEDRO RAMÓN VELÁZQUEZ. DETIDO NEGA TUDO. INVESTIGAÇÃO SEM AVANÇO. SOLICITA-SE INSPETOR.',
+  dispatch: {
+    header: 'Telégrafo da Província · Urgente',
+    body: 'NECOCHEA. DOIS FILHOS DE FRANCISCA ROJAS ENCONTRADOS MORTOS EM SEU RANCHO. MÃE FERIDA ACUSA VIZINHO PEDRO RAMÓN VELÁZQUEZ. DETIDO NEGA TUDO. INVESTIGAÇÃO SEM AVANÇO. SOLICITA-SE INSPETOR.',
+  },
+  copy: {
+    start: 'Seguir com Álvarez para Necochea',
+    investigationTitle: 'Investigação em Necochea',
+    toTraining: 'Levar a mancha para análise',
+  },
   locations: [
     {
       id: 'rancho',
@@ -106,95 +114,106 @@ export const rojas1892: CaseFile = {
       ],
     },
   ],
-  suspects: [
-    {
-      id: 'rojas',
-      name: 'Francisca Rojas',
-      role: 'Mãe das vítimas, que acusa o vizinho',
-      print: {
-        pattern: 'presilla-externa',
-        core: { x: 0.02, y: -0.08 },
-        seed: 1892,
-        minutiae: [
-          { id: '1', x: 0.24, y: 0.16, polarity: 1 },
-          { id: '2', x: -0.2, y: 0.3, polarity: -1 },
-          { id: '3', x: 0.08, y: 0.56, polarity: 1 },
-          { id: 'r4', x: -0.36, y: -0.48, polarity: 1 },
-          { id: 'r5', x: 0.42, y: -0.32, polarity: -1 },
-        ],
+  training: {
+    kind: 'datiloscopia',
+    title: 'O método de Vucetich',
+    lede: 'Antes de comparar a mancha, aprenda a classificar. Vucetich dividia as impressões em quatro tipos. Cada ficha de dez dedos virava uma fórmula, com letras para os polegares e números para os outros dedos, e assim podia ser arquivada e encontrada depressa.',
+    patterns: [
+      {
+        type: 'arco',
+        name: 'Arco',
+        thumbCode: 'A',
+        fingerCode: '1',
+        description: 'As cristas atravessam o dedo de um lado ao outro e sobem no meio, como uma ponte. Não há delta.',
       },
-    },
-    {
-      id: 'velazquez',
-      name: 'Pedro Ramón Velázquez',
-      role: 'Vizinho acusado, detido',
-      print: {
-        pattern: 'presilla-externa',
-        core: { x: -0.05, y: -0.13 },
-        seed: 629,
-        minutiae: [
-          { id: 'v1', x: 0.32, y: 0.04, polarity: -1 },
-          { id: 'v2', x: -0.27, y: 0.18, polarity: 1 },
-          { id: 'v3', x: 0.12, y: 0.62, polarity: -1 },
-          { id: 'v4', x: -0.08, y: -0.56, polarity: 1 },
-        ],
+      {
+        type: 'presilla-interna',
+        name: 'Presilha interna',
+        thumbCode: 'I',
+        fingerCode: '2',
+        description: 'As cristas fazem um laço que se abre para a esquerda de quem olha a ficha. O delta fica à direita.',
       },
-    },
-  ],
-  latent: {
-    sourceSuspectId: 'rojas',
-    view: { x0: -0.5, y0: -0.25, x1: 0.6, y1: 0.75 },
-    minutiaIds: ['1', '2', '3'],
-    caption: 'Fragmento recortado do marco da porta. Os pontos 1, 2 e 3 marcam minúcias legíveis.',
+      {
+        type: 'presilla-externa',
+        name: 'Presilha externa',
+        thumbCode: 'E',
+        fingerCode: '3',
+        description: 'O mesmo laço, aberto para a direita de quem olha a ficha. O delta fica à esquerda.',
+      },
+      {
+        type: 'verticilo',
+        name: 'Verticilo',
+        thumbCode: 'V',
+        fingerCode: '4',
+        description: 'As cristas giram em círculos ou espiral em torno de um centro. Há dois deltas, um de cada lado.',
+      },
+    ],
+    samples: [
+      {
+        id: 't1',
+        print: { pattern: 'verticilo', core: { x: 0.04, y: -0.02 }, seed: 11, minutiae: [{ id: 'a', x: -0.3, y: 0.4, polarity: 1 }] },
+      },
+      {
+        id: 't2',
+        print: { pattern: 'presilla-interna', core: { x: 0.05, y: -0.1 }, seed: 22, minutiae: [{ id: 'a', x: 0.3, y: 0.3, polarity: -1 }] },
+      },
+      {
+        id: 't3',
+        print: { pattern: 'arco', core: { x: -0.05, y: 0 }, seed: 33, minutiae: [{ id: 'a', x: 0.2, y: -0.4, polarity: 1 }] },
+      },
+      {
+        id: 't4',
+        print: { pattern: 'presilla-externa', core: { x: -0.04, y: -0.05 }, seed: 44, minutiae: [{ id: 'a', x: -0.25, y: 0.5, polarity: 1 }] },
+      },
+    ],
   },
-  patterns: [
-    {
-      type: 'arco',
-      name: 'Arco',
-      thumbCode: 'A',
-      fingerCode: '1',
-      description: 'As cristas atravessam o dedo de um lado ao outro e sobem no meio, como uma ponte. Não há delta.',
+  lab: {
+    kind: 'confronto-digital',
+    title: 'Confronto datiloscópico',
+    lede: 'As duas fichas têm o mesmo tipo de desenho, então a classificação sozinha não resolve. Escolha um ponto da latente, clique no lugar correspondente da ficha e depois registre sua conclusão para cada pessoa.',
+    latentTitle: 'Latente: marco da porta',
+    suspects: [
+      {
+        id: 'rojas',
+        name: 'Francisca Rojas',
+        role: 'Mãe das vítimas, que acusa o vizinho',
+        print: {
+          pattern: 'presilla-externa',
+          core: { x: 0.02, y: -0.08 },
+          seed: 1892,
+          minutiae: [
+            { id: '1', x: 0.24, y: 0.16, polarity: 1 },
+            { id: '2', x: -0.2, y: 0.3, polarity: -1 },
+            { id: '3', x: 0.08, y: 0.56, polarity: 1 },
+            { id: 'r4', x: -0.36, y: -0.48, polarity: 1 },
+            { id: 'r5', x: 0.42, y: -0.32, polarity: -1 },
+          ],
+        },
+      },
+      {
+        id: 'velazquez',
+        name: 'Pedro Ramón Velázquez',
+        role: 'Vizinho acusado, detido',
+        print: {
+          pattern: 'presilla-externa',
+          core: { x: -0.05, y: -0.13 },
+          seed: 629,
+          minutiae: [
+            { id: 'v1', x: 0.32, y: 0.04, polarity: -1 },
+            { id: 'v2', x: -0.27, y: 0.18, polarity: 1 },
+            { id: 'v3', x: 0.12, y: 0.62, polarity: -1 },
+            { id: 'v4', x: -0.08, y: -0.56, polarity: 1 },
+          ],
+        },
+      },
+    ],
+    latent: {
+      sourceSuspectId: 'rojas',
+      view: { x0: -0.5, y0: -0.25, x1: 0.6, y1: 0.75 },
+      minutiaIds: ['1', '2', '3'],
+      caption: 'Fragmento recortado do marco da porta. Os pontos 1, 2 e 3 marcam minúcias legíveis.',
     },
-    {
-      type: 'presilla-interna',
-      name: 'Presilha interna',
-      thumbCode: 'I',
-      fingerCode: '2',
-      description: 'As cristas fazem um laço que se abre para a esquerda de quem olha a ficha. O delta fica à direita.',
-    },
-    {
-      type: 'presilla-externa',
-      name: 'Presilha externa',
-      thumbCode: 'E',
-      fingerCode: '3',
-      description: 'O mesmo laço, aberto para a direita de quem olha a ficha. O delta fica à esquerda.',
-    },
-    {
-      type: 'verticilo',
-      name: 'Verticilo',
-      thumbCode: 'V',
-      fingerCode: '4',
-      description: 'As cristas giram em círculos ou espiral em torno de um centro. Há dois deltas, um de cada lado.',
-    },
-  ],
-  training: [
-    {
-      id: 't1',
-      print: { pattern: 'verticilo', core: { x: 0.04, y: -0.02 }, seed: 11, minutiae: [{ id: 'a', x: -0.3, y: 0.4, polarity: 1 }] },
-    },
-    {
-      id: 't2',
-      print: { pattern: 'presilla-interna', core: { x: 0.05, y: -0.1 }, seed: 22, minutiae: [{ id: 'a', x: 0.3, y: 0.3, polarity: -1 }] },
-    },
-    {
-      id: 't3',
-      print: { pattern: 'arco', core: { x: -0.05, y: 0 }, seed: 33, minutiae: [{ id: 'a', x: 0.2, y: -0.4, polarity: 1 }] },
-    },
-    {
-      id: 't4',
-      print: { pattern: 'presilla-externa', core: { x: -0.04, y: -0.05 }, seed: 44, minutiae: [{ id: 'a', x: -0.25, y: 0.5, polarity: 1 }] },
-    },
-  ],
+  },
   accusation: [
     {
       id: 'autoria',

@@ -36,7 +36,9 @@ describe('expectedVerdict', () => {
 });
 
 describe('caso Rojas 1892', () => {
-  const { latent, suspects } = rojas1892;
+  const lab = rojas1892.lab;
+  if (lab.kind !== 'confronto-digital') throw new Error('o caso 1 usa confronto digital');
+  const { latent, suspects } = lab;
 
   it('a latente vem de quem o caso diz', () => {
     const source = suspects.find((s) => s.id === latent.sourceSuspectId);

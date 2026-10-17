@@ -12,7 +12,7 @@ export const STEPS: { id: Step; label: string }[] = [
   { id: 'revelacao', label: 'O que aconteceu' },
 ];
 
-export type SourceKind = 'museu' | 'acadêmico' | 'livro' | 'jornalístico' | 'enciclopédia';
+export type SourceKind = 'museu' | 'acadêmico' | 'livro' | 'jornalístico' | 'enciclopédia' | 'jurídico';
 
 export interface Source {
   label: string;
@@ -41,25 +41,20 @@ export interface Location {
   evidenceIds: string[];
 }
 
-export interface Suspect {
+export interface Option {
   id: string;
-  name: string;
-  role: string;
-  print: FingerprintSpec;
+  text: string;
 }
 
 export interface Question {
   id: string;
   prompt: string;
-  options: { id: string; text: string }[];
+  options: Option[];
   correct: string;
   explanation: string;
 }
 
-export interface TrainingSample {
-  id: string;
-  print: FingerprintSpec;
-}
+/* ---------- Módulos de treino ---------- */
 
 export interface PatternInfo {
   type: PatternType;
@@ -70,18 +65,38 @@ export interface PatternInfo {
   description: string;
 }
 
-export interface CaseFile {
-  id: string;
-  number: number;
+export interface FingerprintTraining {
+  kind: 'datiloscopia';
   title: string;
-  place: string;
-  date: string;
-  technique: string;
-  playerRole: string;
-  intro: string[];
-  telegram: string;
-  locations: Location[];
-  evidence: Evidence[];
+  lede: string;
+  patterns: PatternInfo[];
+  samples: { id: string; print: FingerprintSpec }[];
+}
+
+/** Treino de raciocínio: cada item é uma afirmação a ser classificada. */
+export interface ReasoningTraining {
+  kind: 'raciocinio';
+  title: string;
+  lede: string;
+  items: Question[];
+}
+
+export type TrainingModule = FingerprintTraining | ReasoningTraining;
+
+/* ---------- Módulos de laboratório ---------- */
+
+export interface Suspect {
+  id: string;
+  name: string;
+  role: string;
+  print: FingerprintSpec;
+}
+
+export interface FingerprintLab {
+  kind: 'confronto-digital';
+  title: string;
+  lede: string;
+  latentTitle: string;
   suspects: Suspect[];
   latent: {
     /** De qual ficha a latente realmente veio (resposta do laboratório). */
@@ -90,8 +105,82 @@ export interface CaseFile {
     minutiaIds: string[];
     caption: string;
   };
-  patterns: PatternInfo[];
-  training: TrainingSample[];
+}
+
+/** Uma das hipóteses testadas na simulação da banheira. */
+export interface BathHypothesis {
+  id: string;
+  name: string;
+  description: string;
+  pose: BathPose;
+  /** O que a simulação mostra ao final, em texto. */
+  outcome: string;
+}
+
+/** Ângulos em graus; 0 = horizontal apontando para os pés da banheira. */
+export interface BathPose {
+  /** Inclinação do tronco: 90 = sentado ereto, 0 = deitado. */
+  torso: number;
+  /** Ângulo da coxa em relação ao horizontal. */
+  thigh: number;
+  /** Ângulo da canela em relação ao horizontal. */
+  shin: number;
+  /** Deslocamento do quadril ao longo da banheira, em cm a partir da cabeceira. */
+  hipX: number;
+}
+
+export interface PathologyLab {
+  kind: 'patologia-banho';
+  title: string;
+  lede: string;
+  pattern: {
+    title: string;
+    lede: string;
+    cases: { id: string; label: string }[];
+    features: { id: string; text: string; inAll: boolean; note: string }[];
+  };
+  bath: {
+    title: string;
+    lede: string;
+    /** Medidas usadas na simulação, em centímetros. */
+    bathLength: number;
+    bathDepth: number;
+    waterDepth: number;
+    victimHeight: number;
+    foundDescription: string;
+    /** Posição registrada pelo médico, no formato que a simulação calcula. */
+    found: { headUnderwater: boolean; legsStraight: boolean; feetOut: boolean };
+    hypotheses: BathHypothesis[];
+    /** Hipótese compatível com a posição em que o corpo foi encontrado. */
+    correct: string;
+    explanation: string;
+  };
+}
+
+export type LabModule = FingerprintLab | PathologyLab;
+
+/* ---------- Caso ---------- */
+
+export interface CaseFile {
+  id: string;
+  number: number;
+  title: string;
+  place: string;
+  year: number;
+  date: string;
+  technique: string;
+  playerRole: string;
+  intro: string[];
+  dispatch: { header: string; body: string };
+  copy: {
+    start: string;
+    investigationTitle: string;
+    toTraining: string;
+  };
+  locations: Location[];
+  evidence: Evidence[];
+  training: TrainingModule;
+  lab: LabModule;
   accusation: Question[];
   reveal: {
     summary: string[];
@@ -101,19 +190,25 @@ export interface CaseFile {
   };
 }
 
+/* ---------- Estado ---------- */
+
 export interface GameState {
-  version: 1;
+  version: 2;
   caseId: string;
   step: Step;
   reached: Step[];
   visited: string[];
   training: {
-    answers: Record<string, PatternType>;
+    answers: Record<string, string>;
     firstTry: Record<string, boolean>;
   };
   lab: {
+    /** Confronto digital: pontos marcados por ficha e conclusão por ficha. */
     marks: Record<string, Record<string, { x: number; y: number }>>;
     verdicts: Record<string, Verdict>;
+    /** Patologia: características marcadas no quadro e hipótese escolhida. */
+    features: string[];
+    hypothesis: string | null;
     submitted: boolean;
   };
   accusation: {

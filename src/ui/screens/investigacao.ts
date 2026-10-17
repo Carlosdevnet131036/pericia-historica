@@ -1,5 +1,6 @@
 import type { Evidence } from '../../engine/types';
 import { h } from '../dom';
+import { onCaseChange } from '../view-state';
 import type { Screen } from './context';
 
 const KIND_LABEL: Record<Evidence['kind'], string> = {
@@ -29,6 +30,9 @@ function evidenceCard(e: Evidence): HTMLElement {
 }
 
 let active: string | null = null;
+onCaseChange(() => {
+  active = null;
+});
 
 export const investigacao: Screen = ({ caseFile: c, store }) => {
   const s = store.get();
@@ -43,8 +47,8 @@ export const investigacao: Screen = ({ caseFile: c, store }) => {
   return h(
     'section',
     { class: 'screen investigacao' },
-    h('h2', {}, 'Investigação em Necochea'),
-    h('p', { class: 'lede' }, 'Visite os três lugares e leia o que cada um tem. Os cartões dizem o que é fato documentado e o que foi dramatizado.'),
+    h('h2', {}, c.copy.investigationTitle),
+    h('p', { class: 'lede' }, `Visite os ${c.locations.length} lugares e leia o que cada um tem. Os cartões dizem o que é fato documentado e o que foi dramatizado.`),
     h(
       'div',
       { class: 'investigation-layout' },
@@ -82,7 +86,7 @@ export const investigacao: Screen = ({ caseFile: c, store }) => {
       h(
         'button',
         { class: 'btn primary', disabled: !allVisited, onclick: () => store.goTo('treino') },
-        allVisited ? 'Levar a mancha para análise' : `Visite todos os lugares (${s.visited.length}/${c.locations.length})`,
+        allVisited ? c.copy.toTraining : `Visite todos os lugares (${s.visited.length}/${c.locations.length})`,
       ),
     ),
   );

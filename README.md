@@ -11,7 +11,7 @@ Jogo de investigação no navegador baseado em **casos criminais reais resolvido
 | # | Caso | Ano | Técnica | Status |
 |---|------|-----|---------|--------|
 | 1 | Francisca Rojas, Necochea (Argentina) | 1892 | Datiloscopia (Vucetich) | Jogável |
-| 2 | "Brides in the Bath", G. J. Smith (Inglaterra) | 1915 | Patologia forense | Planejado |
+| 2 | "Brides in the Bath", G. J. Smith (Inglaterra) | 1915 | Patologia forense (Spilsbury) | Jogável |
 | 3 | Sequestro Lindbergh (EUA) | 1932 | Madeira e rastreio de dinheiro | Planejado |
 | 4 | Buck Ruxton (Escócia) | 1935 | Antropologia forense | Planejado |
 | 5 | Unabomber (EUA) | 1996 | Linguística forense | Planejado |
@@ -50,20 +50,25 @@ O build do Node 22 fica disponível por 7 dias como artefato `dist` na página d
 
 ```
 src/
-├── cases/            dados de cada caso (texto, suspeitos, fontes)
-│   └── rojas1892.ts
-├── engine/           regras independentes de UI
-│   ├── types.ts      contrato de um caso (CaseFile) e do estado (GameState)
-│   ├── state.ts      store imutável + persistência em localStorage
-│   └── scoring.ts    pontuação
-├── forensics/        "ciência" do jogo, funções puras e testadas
-│   ├── fingerprint.ts gerador procedural de digitais
-│   └── match.ts      confronto de minúcias
+├── cases/              dados de cada caso (texto, módulos de perícia, fontes)
+│   ├── index.ts        lista de casos jogáveis e planejados
+│   ├── rojas1892.ts
+│   └── smith1915.ts
+├── engine/             regras independentes de UI
+│   ├── types.ts        contrato de um caso (CaseFile) e do estado (GameState)
+│   ├── state.ts        store imutável + persistência em localStorage
+│   └── scoring.ts      pontuação, despachada pelo tipo de cada módulo
+├── forensics/          "ciência" do jogo, funções puras e testadas
+│   ├── fingerprint.ts  gerador procedural de digitais
+│   ├── match.ts        confronto de minúcias
+│   └── bath.ts         geometria do corpo na banheira
 ├── ui/
-│   ├── dom.ts        helper h() para criar elementos
-│   ├── prints.ts     cache de renderização das digitais
-│   └── screens/      uma tela por etapa do caso
-├── main.ts           roteamento entre etapas
+│   ├── modules/        uma tela por técnica (datiloscopia, raciocínio, patologia)
+│   ├── screens/        etapas comuns a todo caso; treino e laboratório despacham por `kind`
+│   ├── view-state.ts   zera o estado de visualização ao trocar de caso
+│   ├── dom.ts          helper h() para criar elementos
+│   └── prints.ts       cache de renderização das digitais
+├── main.ts             rotas por hash (#smith-1915) e render
 └── styles.css
 ```
 
@@ -71,6 +76,7 @@ Decisões principais:
 
 - **Sem framework.** Com seis telas e estado pequeno, React ou Vue trariam mais complexidade que benefício (YAGNI). O padrão "estado → render" é o mesmo, então migrar depois é simples.
 - **Casos como dados.** Um caso novo é um arquivo em `src/cases/` que segue `CaseFile`. O motor não conhece nenhum caso específico.
+- **Técnicas como módulos.** Treino e laboratório são *unions discriminadas* pelo campo `kind`. Uma técnica nova é um tipo novo em `types.ts`, uma tela em `ui/modules/` e um `case` a mais em cada `switch`; o TypeScript aponta os `switch` que ficaram sem tratar o tipo novo.
 - **Ciência isolada da UI.** `forensics/` não toca no DOM, exceto na função de render, por isso dá para testar com Vitest.
 - **Digitais procedurais.** Cada crista é uma curva de nível de um campo escalar; as minúcias são singularidades de fase (±atan2) que criam bifurcações e terminações reais. Um teste verifica que uma volta em torno de uma minúcia soma exatamente 2π à fase.
 

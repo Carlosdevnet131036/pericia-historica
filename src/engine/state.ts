@@ -1,28 +1,29 @@
 import type { GameState, Step } from './types';
 import { STEPS } from './types';
 
-const KEY_PREFIX = 'pericia-historica:v1:';
+// v2: o formato do estado mudou com os módulos de perícia; saves v1 são ignorados.
+const KEY_PREFIX = 'pericia-historica:v2:';
 
 export function initialState(caseId: string): GameState {
   return {
-    version: 1,
+    version: 2,
     caseId,
     step: 'expediente',
     reached: ['expediente'],
     visited: [],
     training: { answers: {}, firstTry: {} },
-    lab: { marks: {}, verdicts: {}, submitted: false },
+    lab: { marks: {}, verdicts: {}, features: [], hypothesis: null, submitted: false },
     accusation: { answers: {}, submitted: false },
   };
 }
 
 /** localStorage pode não existir ou lançar exceção (aba anônima, iframe). */
-function load(caseId: string): GameState | null {
+export function loadSaved(caseId: string): GameState | null {
   try {
     const raw = localStorage.getItem(KEY_PREFIX + caseId);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as GameState;
-    return parsed.version === 1 && parsed.caseId === caseId ? parsed : null;
+    return parsed.version === 2 && parsed.caseId === caseId ? parsed : null;
   } catch {
     return null;
   }
@@ -47,7 +48,7 @@ export class Store {
   private listeners = new Set<Listener>();
 
   constructor(caseId: string) {
-    this.state = load(caseId) ?? initialState(caseId);
+    this.state = loadSaved(caseId) ?? initialState(caseId);
   }
 
   get(): GameState {
@@ -70,6 +71,17 @@ export class Store {
       ...s,
       step,
       reached: s.reached.includes(step) ? s.reached : [...s.reached, step],
+    }));
+  }
+
+  /** Registra uma resposta de treino; só a primeira tentativa conta pontos. */
+  answerTraining(id: string, answer: string, correct: string): void {
+    this.update((s) => ({
+      ...s,
+      training: {
+        answers: { ...s.training.answers, [id]: answer },
+        firstTry: id in s.training.firstTry ? s.training.firstTry : { ...s.training.firstTry, [id]: answer === correct },
+      },
     }));
   }
 
