@@ -1,5 +1,9 @@
 import * as THREE from 'three';
-import { adobeTexture, dirtTexture, groundTexture, thatchTexture, woodTexture } from '../materials';
+import type { ObjectId } from '../../engine/types';
+import { box, circle, overlaps, type Collider } from '../collision';
+import type { Interactable } from '../interaction';
+import type { Vec2 } from '../motion';
+import { adobeTexture, dirtTexture, groundTexture, sizedBox, thatchTexture, woodTexture } from '../materials';
 
 /**
  * O rancho de Francisca Rojas, Necochea, 1892: reconstrução dramatizada.
@@ -9,21 +13,58 @@ import { adobeTexture, dirtTexture, groundTexture, thatchTexture, woodTexture } 
  * ramada na frente, curral de estacas e um ombú. Unidades em metros; a frente
  * da casa olha para +z, onde o jogador começa.
  *
- * Etapa 1: só o exterior, sem colisões nem objetos da busca.
+ * Etapa 2: paredes, móveis, curral e árvore bloqueiam o jogador e a câmera;
+ * a porta abre e fecha; a lamparina pode ser examinada. Os oito objetos da
+ * busca entram na etapa 3.
  */
+
+/** O que o painel de exame mostra. `nature` separa fato documentado de cena. */
+export interface ExamineInfo {
+  object: ObjectId;
+  title: string;
+  nature: 'dramatizado';
+  text: string;
+}
+
+export interface SceneInteractable extends Interactable {
+  /** Usa o objeto. Devolve o que mostrar, quando é um exame. */
+  use(): ExamineInfo | void;
+}
+
 export interface SceneBuild {
   root: THREE.Group;
   spawn: THREE.Vector3;
   /** Raio do terreno onde o jogador pode andar. */
   boundsRadius: number;
-  update(time: number): void;
+  /** Obstáculos atuais (a porta muda conforme abre ou fecha). */
+  colliders(): readonly Collider[];
+  interactables: SceneInteractable[];
+  update(time: number, dt: number): void;
 }
 
 const HOUSE_Z = -6;
 const HOUSE_W = 9;
 const HOUSE_D = 5;
 const WALL_H = 2.6;
+const WALL_T = 0.4;
 const RIDGE = 1.7;
+const DOOR_X0 = 0.1;
+const DOOR_X1 = 1.1;
+const DOOR_H = 2;
+/** Raio do jogador para as colisões, o mesmo usado em index.ts. */
+export const PLAYER_RADIUS = 0.3;
+/** Intensidade da lamparina e da claridade que escapa para o terreiro (calibradas para exposição 1,5). */
+const LAMP_POWER = 2.2;
+const SPILL_POWER = 16;
+
+const LAMP: ExamineInfo = {
+  object: 'lamparina',
+  title: 'Lamparina',
+  nature: 'dramatizado',
+  text:
+    'Lamparina a querosene sobre a mesa, a iluminação comum no campo no fim do século XIX. ' +
+    'É peça de cena: o processo de 1892 não descreve os objetos da casa, e ela não é um indício do caso.',
+};
 
 /** Gerador determinístico, para a vegetação ficar sempre no mesmo lugar. */
 function rng(seed: number) {
@@ -34,24 +75,34 @@ function rng(seed: number) {
   };
 }
 
-export function buildRancho(): SceneBuild {
+export function buildRancho(getPlayer: () => Vec2): SceneBuild {
   const root = new THREE.Group();
   root.name = 'rancho';
   const r = rng(1892);
+  const colliders: Collider[] = [];
 
   const adobe = new THREE.MeshStandardMaterial({ map: adobeTexture(), roughness: 0.95 });
   const thatch = new THREE.MeshStandardMaterial({ map: thatchTexture(), roughness: 1, side: THREE.DoubleSide });
   const wood = new THREE.MeshStandardMaterial({ map: woodTexture(), roughness: 0.9 });
 
-  const add = <T extends THREE.Object3D>(o: T, shadow = true): T => {
+  const add = <T extends THREE.Object3D>(o: T, shadow = true, parent: THREE.Object3D = root): T => {
     o.traverse((c) => {
       if (c instanceof THREE.Mesh) {
         c.castShadow = shadow;
         c.receiveShadow = true;
       }
     });
-    root.add(o);
+    parent.add(o);
     return o;
+  };
+
+  /** Caixa visível que também é obstáculo, com a mesma posição e tamanho. */
+  const solidBox = (mat: THREE.Material, cx: number, cy: number, cz: number, w: number, h: number, d: number, flags?: { solid?: boolean; camera?: boolean }, tile = 3) => {
+    const mesh = new THREE.Mesh(sizedBox(w, h, d, tile), mat);
+    mesh.position.set(cx, cy, cz);
+    add(mesh);
+    colliders.push(box(cx, cy, cz, w, h, d, flags));
+    return mesh;
   };
 
   /* ---------- Chão ---------- */
@@ -61,18 +112,43 @@ export function buildRancho(): SceneBuild {
   ground.receiveShadow = true;
   root.add(ground);
 
-  const yard = new THREE.Mesh(new THREE.CircleGeometry(7.5, 32), new THREE.MeshStandardMaterial({ map: dirtTexture(), roughness: 1 }));
+  const dirt = new THREE.MeshStandardMaterial({ map: dirtTexture(), roughness: 1 });
+  const yard = new THREE.Mesh(new THREE.CircleGeometry(7.5, 32), dirt);
   yard.rotation.x = -Math.PI / 2;
   yard.position.set(0, 0.01, HOUSE_Z + 5);
   yard.receiveShadow = true;
   root.add(yard);
 
-  /* ---------- A casa ---------- */
+  /* ---------- A casa: paredes em trechos, com o vão da porta ---------- */
 
   const front = HOUSE_Z + HOUSE_D / 2;
-  const walls = new THREE.Mesh(new THREE.BoxGeometry(HOUSE_W, WALL_H, HOUSE_D), adobe);
-  walls.position.set(0, WALL_H / 2, HOUSE_Z);
-  add(walls);
+  const back = HOUSE_Z - HOUSE_D / 2;
+  const left = -HOUSE_W / 2;
+  const right = HOUSE_W / 2;
+  const midY = WALL_H / 2;
+
+  // Chão de terra batida por dentro.
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(HOUSE_W - WALL_T * 2, HOUSE_D - WALL_T * 2), dirt);
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.set(0, 0.02, HOUSE_Z);
+  floor.receiveShadow = true;
+  root.add(floor);
+
+  solidBox(adobe, 0, midY, back + WALL_T / 2, HOUSE_W, WALL_H, WALL_T); // fundos
+  solidBox(adobe, left + WALL_T / 2, midY, HOUSE_Z, WALL_T, WALL_H, HOUSE_D - WALL_T * 2); // lado esquerdo
+  solidBox(adobe, right - WALL_T / 2, midY, HOUSE_Z, WALL_T, WALL_H, HOUSE_D - WALL_T * 2); // lado direito
+  const fz = front - WALL_T / 2;
+  solidBox(adobe, (left + DOOR_X0) / 2, midY, fz, DOOR_X0 - left, WALL_H, WALL_T); // frente, à esquerda da porta
+  solidBox(adobe, (DOOR_X1 + right) / 2, midY, fz, right - DOOR_X1, WALL_H, WALL_T); // frente, à direita
+  // Verga sobre a porta: só a câmera bate nela (o jogador passa por baixo).
+  solidBox(adobe, (DOOR_X0 + DOOR_X1) / 2, (DOOR_H + WALL_H) / 2, fz, DOOR_X1 - DOOR_X0, WALL_H - DOOR_H, WALL_T, { solid: false });
+
+  // Batentes de madeira no vão.
+  for (const x of [DOOR_X0, DOOR_X1]) {
+    const jamb = new THREE.Mesh(new THREE.BoxGeometry(0.08, DOOR_H, WALL_T + 0.04), wood);
+    jamb.position.set(x, DOOR_H / 2, fz);
+    add(jamb);
+  }
 
   // Empenas triangulares nas laterais.
   const gableShape = new THREE.Shape();
@@ -97,42 +173,124 @@ export function buildRancho(): SceneBuild {
     roof.position.set(0, WALL_H + RIDGE / 2 + 0.05, HOUSE_Z - side * (HOUSE_D / 4 + 0.1));
     add(roof);
   }
+  // Para a câmera, telhado e empenas viram um volume só: ela não sobe através da palha.
+  colliders.push(box(0, WALL_H + (RIDGE + 0.2) / 2, HOUSE_Z, HOUSE_W + 0.9, RIDGE + 0.2, HOUSE_D + 1, { solid: false }));
 
-  // Porta e janelas na frente. As janelas brilham: há uma luz acesa lá dentro.
-  const door = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 0.08), wood);
-  door.position.set(0.6, 1, front + 0.04);
-  add(door);
+  // Janelas: por fora brilham (há luz lá dentro); por dentro mostram a noite.
   const glow = new THREE.MeshStandardMaterial({ color: 0x3a2412, emissive: 0xffa24a, emissiveIntensity: 1.6 });
+  const nightGlass = new THREE.MeshStandardMaterial({ color: 0x0e1622, emissive: 0x1c2c42, emissiveIntensity: 0.8, roughness: 0.4 });
+  const frameMat = wood;
   for (const x of [-2.8, 3]) {
-    const w = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.6, 0.06), glow);
-    w.position.set(x, 1.55, front + 0.03);
+    // Faces da caixa: +x, −x, +y, −y, +z (rua), −z (interior).
+    const w = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.6, WALL_T + 0.02), [frameMat, frameMat, frameMat, frameMat, glow, nightGlass]);
+    w.position.set(x, 1.55, fz);
     add(w, false);
     const sill = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.08, 0.16), wood);
     sill.position.set(x, 1.21, front + 0.06);
     add(sill);
   }
 
-  // Ramada: alpendre de troncos e galhos em frente à porta.
+  /* ---------- A porta: abre para dentro, girando no batente direito ---------- */
+
+  const hinge = new THREE.Group();
+  hinge.position.set(DOOR_X1 - 0.04, 0, fz);
+  const doorLeaf = new THREE.Mesh(new THREE.BoxGeometry(DOOR_X1 - DOOR_X0 - 0.08, DOOR_H - 0.04, 0.08), wood);
+  doorLeaf.position.set(-(DOOR_X1 - DOOR_X0 - 0.08) / 2, DOOR_H / 2, 0);
+  add(doorLeaf, true, hinge);
+  root.add(hinge);
+
+  const leafW = DOOR_X1 - DOOR_X0 - 0.08;
+  const doorClosed = box(DOOR_X0 + 0.04 + leafW / 2, DOOR_H / 2, fz, leafW, DOOR_H, 0.08);
+  // Aberta, a folha fica encostada no batente, perpendicular à parede.
+  const doorOpen = box(DOOR_X1 - 0.04, DOOR_H / 2, fz - leafW / 2, 0.08, DOOR_H, leafW);
+  let doorIsOpen = false;
+  let doorAngle = 0; // 0 fechada; −π/2·0,95 aberta (o sinal negativo gira para −z, para dentro)
+  const OPEN_ANGLE = -Math.PI / 2 * 0.95;
+  const doorCenter = { x: (DOOR_X0 + DOOR_X1) / 2, z: fz };
+
+  /* ---------- Interior (cenografia) ---------- */
+
+  // Mesa rústica com a lamparina, banco e um baú.
+  const tableX = -2.5;
+  const tableZ = HOUSE_Z - 0.9;
+  const table = new THREE.Group();
+  const top = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.06, 0.8), wood);
+  top.position.y = 0.76;
+  table.add(top);
+  for (const [lx, lz] of [[-0.62, -0.32], [0.62, -0.32], [-0.62, 0.32], [0.62, 0.32]] as const) {
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.73, 0.07), wood);
+    leg.position.set(lx, 0.365, lz);
+    table.add(leg);
+  }
+  table.position.set(tableX, 0, tableZ);
+  add(table);
+  colliders.push(box(tableX, 0.4, tableZ, 1.4, 0.8, 0.8, { camera: false }));
+
+  const bench = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.08, 0.32), wood);
+  bench.position.set(tableX, 0.44, tableZ + 0.8);
+  add(bench);
+  for (const lx of [-0.5, 0.5]) {
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.42, 0.28), wood);
+    leg.position.set(tableX + lx, 0.21, tableZ + 0.8);
+    add(leg);
+  }
+  colliders.push(box(tableX, 0.24, tableZ + 0.8, 1.2, 0.48, 0.32, { camera: false }));
+
+  solidBox(wood, 3.1, 0.3, back + WALL_T + 0.35, 1, 0.6, 0.55, { camera: false }, 1);
+
+  // A lamparina: base, reservatório, chaminé de vidro e chama.
+  const lamp = new THREE.Group();
+  const brass = new THREE.MeshStandardMaterial({ color: 0x8a6a3a, metalness: 0.6, roughness: 0.45 });
+  const lampBase = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 0.03, 12), brass);
+  lampBase.position.y = 0.015;
+  const font = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 0.1, 12), brass);
+  font.position.y = 0.08;
+  const flameMat = new THREE.MeshStandardMaterial({ color: 0x331a00, emissive: 0xffb45a, emissiveIntensity: 3 });
+  const flame = new THREE.Mesh(new THREE.ConeGeometry(0.018, 0.06, 8), flameMat);
+  flame.position.y = 0.17;
+  const glass = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.035, 0.05, 0.16, 12, 1, true),
+    new THREE.MeshStandardMaterial({ color: 0xf2e6cc, transparent: true, opacity: 0.3, emissive: 0xffb060, emissiveIntensity: 0.5, side: THREE.DoubleSide, depthWrite: false }),
+  );
+  glass.position.y = 0.2;
+  lamp.add(lampBase, font, flame, glass);
+  const lampX = tableX + 0.35;
+  const lampZ = tableZ - 0.05;
+  lamp.position.set(lampX, 0.79, lampZ);
+  add(lamp, false);
+
+  // A luz da lamparina ilumina o cômodo; uma segunda luz, fora, representa a
+  // claridade que escapa pela porta e pelas janelas.
+  const lampLight = new THREE.PointLight(0xffa04a, LAMP_POWER, 7, 1.6);
+  lampLight.position.set(lampX, 1.1, lampZ);
+  root.add(lampLight);
+
+  /* ---------- Ramada: alpendre de troncos e galhos em frente à porta ---------- */
+
   for (const x of [-3.6, -1.2, 1.2, 3.6]) {
+    const px = x + (r() - 0.5) * 0.1;
     const post = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 2.35, 6), wood);
-    post.position.set(x + (r() - 0.5) * 0.1, 1.17, front + 2.1);
+    post.position.set(px, 1.17, front + 2.1);
     post.rotation.z = (r() - 0.5) * 0.06;
     add(post);
+    colliders.push(circle(px, front + 2.1, 0.1, 2.35));
   }
   const ramada = new THREE.Mesh(new THREE.BoxGeometry(8, 0.1, 2.4), wood);
   ramada.position.set(0, 2.38, front + 1.15);
   ramada.rotation.x = 0.09;
   add(ramada);
+  colliders.push(box(0, 2.38, front + 1.15, 8, 0.25, 2.4, { solid: false }));
 
   /* ---------- Curral de estacas ---------- */
 
   const postGeo = new THREE.CylinderGeometry(0.05, 0.07, 1, 5);
   const fencePoints: THREE.Vector3[] = [];
   const corral = { x0: 8, x1: 15, z0: -10, z1: -1 };
+  const gateZ = corral.z1 - 2.5;
   for (let x = corral.x0; x <= corral.x1; x += 0.55) fencePoints.push(new THREE.Vector3(x, 0, corral.z0), new THREE.Vector3(x, 0, corral.z1));
   for (let z = corral.z0 + 0.55; z < corral.z1; z += 0.55) {
     fencePoints.push(new THREE.Vector3(corral.x1, 0, z));
-    if (z < corral.z1 - 2.5) fencePoints.push(new THREE.Vector3(corral.x0, 0, z)); // porteira aberta
+    if (z < gateZ) fencePoints.push(new THREE.Vector3(corral.x0, 0, z)); // porteira aberta
   }
   const fence = new THREE.InstancedMesh(postGeo, wood, fencePoints.length);
   const m = new THREE.Matrix4();
@@ -142,6 +300,17 @@ export function buildRancho(): SceneBuild {
     fence.setMatrixAt(i, m);
   });
   add(fence);
+  // A cerca bloqueia o jogador como uma linha contínua (as estacas ficam a
+  // menos de um corpo de distância), mas não a câmera, que enxerga entre elas.
+  const fenceFlags = { camera: false };
+  const cx = (corral.x0 + corral.x1) / 2;
+  const cw = corral.x1 - corral.x0 + 0.15;
+  colliders.push(
+    box(cx, 0.7, corral.z0, cw, 1.4, 0.15, fenceFlags),
+    box(cx, 0.7, corral.z1, cw, 1.4, 0.15, fenceFlags),
+    box(corral.x1, 0.7, (corral.z0 + corral.z1) / 2, 0.15, 1.4, corral.z1 - corral.z0, fenceFlags),
+    box(corral.x0, 0.7, (corral.z0 + gateZ) / 2, 0.15, 1.4, gateZ - corral.z0, fenceFlags),
+  );
 
   /* ---------- O ombú ---------- */
 
@@ -157,6 +326,7 @@ export function buildRancho(): SceneBuild {
   }
   tree.position.set(-10, 0, -3);
   add(tree);
+  colliders.push(circle(-10, -3, 0.95, 3.2));
 
   /* ---------- Vegetação baixa (instanciada: uma chamada de desenho) ---------- */
 
@@ -209,20 +379,53 @@ export function buildRancho(): SceneBuild {
   moonLight.shadow.bias = -0.0005;
   root.add(moonLight);
 
-  // Luz quente que escapa pela janela e pela fresta da porta.
-  const warm = new THREE.PointLight(0xffa04a, 22, 12, 1.2);
-  warm.position.set(0.4, 1.7, front + 0.8);
+  // Afastada da fachada: colada nela, estourava a parede quando a câmera se aproxima.
+  const warm = new THREE.PointLight(0xffa04a, SPILL_POWER, 12, 1.2);
+  warm.position.set(0.4, 2, front + 1.8);
   root.add(warm);
+
+  /* ---------- Interações ---------- */
+
+  const interactables: SceneInteractable[] = [
+    {
+      id: 'porta',
+      at: doorCenter,
+      reach: 1.6,
+      label: () => (doorIsOpen ? 'Fechar a porta' : 'Abrir a porta'),
+      // Não fecha a porta em cima do jogador.
+      enabled: () => !doorIsOpen || !overlaps(getPlayer(), PLAYER_RADIUS, [doorClosed]),
+      use: () => {
+        doorIsOpen = !doorIsOpen;
+      },
+    },
+    {
+      id: 'lamparina',
+      at: { x: lampX, z: lampZ },
+      reach: 1.5,
+      label: () => 'Examinar a lamparina',
+      use: () => LAMP,
+    },
+  ];
 
   return {
     root,
     spawn: new THREE.Vector3(0, 0, 9),
     boundsRadius: 30,
-    update(time: number) {
-      // A chama da lamparina lá dentro tremula.
+    colliders: () => [...colliders, doorIsOpen ? doorOpen : doorClosed],
+    interactables,
+    update(time: number, dt: number) {
+      // A chama da lamparina tremula, e a claridade lá fora acompanha.
       const flicker = 0.88 + Math.sin(time * 7.3) * 0.06 + Math.sin(time * 13.1) * 0.04;
-      warm.intensity = 22 * flicker;
+      warm.intensity = SPILL_POWER * flicker;
+      lampLight.intensity = LAMP_POWER * flicker;
       glow.emissiveIntensity = 1.6 * flicker;
+      flameMat.emissiveIntensity = 3 * flicker;
+      flame.scale.y = 0.9 + (flicker - 0.88) * 2;
+
+      // A porta gira suavemente até o ângulo alvo (amortecimento exponencial).
+      const targetAngle = doorIsOpen ? OPEN_ANGLE : 0;
+      doorAngle += (targetAngle - doorAngle) * (1 - Math.exp(-dt * 8));
+      hinge.rotation.y = doorAngle;
     },
   };
 }

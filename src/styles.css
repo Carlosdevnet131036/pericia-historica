@@ -2016,3 +2016,36 @@ a.case-card:hover {
   text-decoration: none;
   font-size: 0.92rem;
 }
+
+/* Aviso de interação ("E  Abrir a porta"), no centro, abaixo da mira. */
+.world-prompt {
+  position: absolute;
+  left: 50%;
+  bottom: 22%;
+  transform: translateX(-50%);
+  padding: 6px 14px;
+  background: rgb(11 16 24 / 0.78);
+  border: 1px solid var(--rule);
+  font-family: var(--font-type);
+  font-size: 0.9rem;
+  white-space: pre;
+  pointer-events: none;
+}
+
+.world-examine {
+  max-width: 420px;
+}
+
+.world-examine-art {
+  width: 160px;
+  height: 160px;
+  justify-self: center;
+}
+
+.world-nature {
+  font-family: var(--font-type);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--stamp);
+}

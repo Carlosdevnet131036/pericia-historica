@@ -24,6 +24,31 @@ function noiseCanvas(size: number, base: string, specks: { color: string; count:
   return c;
 }
 
+/**
+ * Caixa com UV proporcional ao tamanho real de cada face, para a textura ter
+ * a mesma escala em paredes de larguras diferentes (`tile` = metros por
+ * repetição). Sem isso, um trecho de 1 m e outro de 4 m esticariam a mesma
+ * imagem por inteiro.
+ */
+export function sizedBox(w: number, h: number, d: number, tile: number): THREE.BoxGeometry {
+  const geo = new THREE.BoxGeometry(w, h, d);
+  const uv = geo.getAttribute('uv') as THREE.BufferAttribute;
+  // Ordem das faces na BoxGeometry: +x, −x, +y, −y, +z, −z; 4 vértices cada.
+  const faces: [number, number][] = [
+    [d, h],
+    [d, h],
+    [w, d],
+    [w, d],
+    [w, h],
+    [w, h],
+  ];
+  faces.forEach(([fu, fv], f) => {
+    for (let i = f * 4; i < f * 4 + 4; i++) uv.setXY(i, (uv.getX(i) * fu) / tile, (uv.getY(i) * fv) / tile);
+  });
+  uv.needsUpdate = true;
+  return geo;
+}
+
 function toTexture(canvas: HTMLCanvasElement, repeat: number): THREE.CanvasTexture {
   const t = new THREE.CanvasTexture(canvas);
   t.wrapS = t.wrapT = THREE.RepeatWrapping;

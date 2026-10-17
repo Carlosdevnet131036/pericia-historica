@@ -1,8 +1,12 @@
 import * as THREE from 'three';
+import { canvas } from '../ui/art/svg';
+import { placedObject } from '../ui/art/objects';
+import { cameraDistance, resolveCircle } from './collision';
 import { Input } from './input';
+import { pickInteractable } from './interaction';
 import { clampPitch, clampToRadius, headingOf, moveDelta, orbitPosition, turnTowards } from './motion';
 import { createPlayer } from './player';
-import { buildRancho } from './scenes/rancho';
+import { buildRancho, PLAYER_RADIUS, type ExamineInfo, type SceneInteractable } from './scenes/rancho';
 
 /**
  * Ponto de entrada do modo 3D. Este arquivo (e o Three.js) só é baixado
@@ -18,10 +22,16 @@ export interface WorldHandle {
   dispose(): void;
 }
 
-type Mode = 'intro' | 'playing' | 'paused';
+type Mode = 'intro' | 'playing' | 'paused' | 'examine';
 
 const CAMERA_DISTANCE = 4.6;
 const HEAD_HEIGHT = 1.65;
+/** Com a câmera mais perto que isso, ela estaria dentro do personagem: ele some. */
+const HIDE_PLAYER_BELOW = 0.7;
+
+const NATURE_LABEL: Record<ExamineInfo['nature'], string> = {
+  dramatizado: 'Reconstrução dramatizada',
+};
 
 export function webglAvailable(): boolean {
   try {
@@ -77,10 +87,9 @@ export function mountWorld(container: HTMLElement, opts: WorldOptions): WorldHan
 
   const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 400);
 
-  const world = buildRancho();
-  scene.add(world.root);
-
   const player = createPlayer();
+  const world = buildRancho(() => ({ x: player.root.position.x, z: player.root.position.z }));
+  scene.add(world.root);
   player.root.position.copy(world.spawn);
   player.root.rotation.y = Math.PI; // de frente para a casa
   scene.add(player.root);
@@ -88,18 +97,34 @@ export function mountWorld(container: HTMLElement, opts: WorldOptions): WorldHan
   /* ---------- Interface sobreposta ---------- */
 
   const hud = el('div', 'world-hud');
-  hud.append(el('p', 'world-eyebrow', `${opts.caseTitle} · protótipo 3D, etapa 1`), el('p', 'world-place', opts.locationName));
-  const help = el('p', 'world-help', 'W A S D andar · Shift correr · mouse olhar · Esc pausar');
+  hud.append(el('p', 'world-eyebrow', `${opts.caseTitle} · protótipo 3D, etapa 2`), el('p', 'world-place', opts.locationName));
+  const help = el('p', 'world-help', 'W A S D andar · Shift correr · mouse olhar · E interagir · Esc pausar');
+  const prompt = el('p', 'world-prompt');
+  prompt.hidden = true;
+  prompt.setAttribute('aria-live', 'polite');
   const overlay = el('div', 'world-overlay');
   const card = el('div', 'world-card');
+  card.setAttribute('role', 'dialog');
   overlay.append(card);
-  container.append(hud, help, overlay);
+  container.append(hud, help, prompt, overlay);
 
   let mode: Mode = 'intro';
-  // Esc só pausa; para voltar, o jogador clica em "Continuar" (o navegador
-  // exige um clique para capturar o mouse de novo).
-  const input = new Input(renderer.domElement, undefined, () => {
-    if (mode === 'playing') setMode('paused');
+  let focused: SceneInteractable | null = null;
+
+  const input = new Input(renderer.domElement, {
+    // Esc só pausa; para voltar, o jogador clica em "Continuar" (o navegador
+    // exige um gesto para capturar o mouse de novo).
+    pause: () => {
+      if (mode === 'playing' || mode === 'examine') setMode('paused');
+    },
+    // E usa o objeto em foco; no painel de exame, E também fecha o painel.
+    interact: () => {
+      if (mode === 'examine') void resume();
+      else if (mode === 'playing' && focused) {
+        const shown = focused.use();
+        if (shown) showExamine(shown);
+      }
+    },
   });
 
   const resume = async () => {
@@ -108,29 +133,57 @@ export function mountWorld(container: HTMLElement, opts: WorldOptions): WorldHan
     renderer.domElement.focus();
   };
 
+  function actions(primary: string): HTMLDivElement {
+    const go = el('button', 'btn primary', primary);
+    go.addEventListener('click', () => void resume());
+    const back = el('a', 'btn ghost', 'Voltar ao caso');
+    back.href = opts.backHref;
+    const row = el('div', 'world-actions');
+    row.append(go, back);
+    queueMicrotask(() => go.focus());
+    return row;
+  }
+
   function setMode(next: Mode): void {
     mode = next;
     overlay.hidden = next === 'playing';
     help.hidden = next !== 'playing';
-    if (next === 'playing') return;
+    prompt.hidden = true;
+    if (next === 'playing' || next === 'examine') return;
     input.unlock();
     const title = next === 'intro' ? opts.locationName : 'Pausa';
     const text =
       next === 'intro'
-        ? 'Reconstrução dramatizada de um rancho do pampa em 1892. Nesta etapa você só explora o terreno; as interações chegam nas próximas.'
+        ? 'Reconstrução dramatizada de um rancho do pampa em 1892. A casa já pode ser visitada: abra a porta e examine o que estiver ao alcance. Os objetos da busca chegam na próxima etapa.'
         : 'O jogo está pausado.';
-    const go = el('button', 'btn primary', next === 'intro' ? 'Explorar' : 'Continuar');
-    go.addEventListener('click', () => void resume());
-    const back = el('a', 'btn ghost', 'Voltar ao caso');
-    back.href = opts.backHref;
-    const actions = el('div', 'world-actions');
-    actions.append(go, back);
-    card.replaceChildren(el('h2', '', title), el('p', '', text), actions);
-    go.focus();
+    card.className = 'world-card';
+    card.replaceChildren(el('h2', '', title), el('p', '', text), actions(next === 'intro' ? 'Explorar' : 'Continuar'));
   }
+
+  /** Painel de exame: o mouse é liberado para ler e clicar; E ou o botão voltam. */
+  function showExamine(info: ExamineInfo): void {
+    mode = 'examine';
+    input.unlock();
+    overlay.hidden = false;
+    help.hidden = true;
+    prompt.hidden = true;
+    const art = canvas('-30 -30 60 60', info.title);
+    art.root.append(placedObject(info.object, art.hatch, 0, 0, 0, 1.15));
+    art.root.classList.add('world-examine-art');
+    card.className = 'world-card world-examine';
+    card.replaceChildren(
+      art.root,
+      el('p', 'world-nature', NATURE_LABEL[info.nature]),
+      el('h2', '', info.title),
+      el('p', '', info.text),
+      actions('Voltar à exploração (E)'),
+    );
+  }
+
   setMode('intro');
 
-  // Sair do pointer lock (Esc do navegador) pausa o jogo.
+  // Sair do pointer lock (Esc do navegador) pausa o jogo. No exame o mouse já
+  // está solto de propósito, então não conta.
   const onLockChange = () => {
     if (!input.locked && mode === 'playing') setMode('paused');
   };
@@ -153,8 +206,12 @@ export function mountWorld(container: HTMLElement, opts: WorldOptions): WorldHan
 
   let yaw = 0;
   let pitch = 0.28;
-  const target = new THREE.Vector3();
-  const desired = new THREE.Vector3();
+  let camDist = CAMERA_DISTANCE;
+  // O ponto que a câmera segue é suavizado; a câmera em si é posta exatamente
+  // na órbita em volta dele. Suavizar a posição da câmera (como na etapa 1)
+  // faria ela cortar caminho por dentro das paredes nas curvas.
+  const target = new THREE.Vector3(world.spawn.x, HEAD_HEIGHT, world.spawn.z);
+  const follow = new THREE.Vector3();
   const timer = new THREE.Timer();
   let frame = 0;
 
@@ -164,6 +221,7 @@ export function mountWorld(container: HTMLElement, opts: WorldOptions): WorldHan
     // Passo limitado: se o jogo engasgar, ninguém atravessa paredes num salto.
     const dt = Math.min(timer.getDelta(), 0.05);
     const time = timer.getElapsed();
+    const pos = player.root.position;
 
     let speed = 0;
     if (mode === 'playing') {
@@ -172,38 +230,59 @@ export function mountWorld(container: HTMLElement, opts: WorldOptions): WorldHan
       pitch = clampPitch(pitch + look.pitch);
       const d = moveDelta(input.move, yaw, dt);
       if (d.moving) {
-        const p = clampToRadius({ x: player.root.position.x + d.x, z: player.root.position.z + d.z }, world.boundsRadius);
-        player.root.position.x = p.x;
-        player.root.position.z = p.z;
+        const wanted = clampToRadius({ x: pos.x + d.x, z: pos.z + d.z }, world.boundsRadius);
+        const p = resolveCircle(wanted, PLAYER_RADIUS, world.colliders());
+        // Velocidade real (depois da colisão): encostado na parede, o passo diminui.
+        speed = Math.hypot(p.x - pos.x, p.z - pos.z) / dt;
+        pos.x = p.x;
+        pos.z = p.z;
         player.root.rotation.y = turnTowards(player.root.rotation.y, headingOf(d), dt * 10);
-        speed = Math.hypot(d.x, d.z) / dt;
       }
+
+      focused = pickInteractable(pos, yaw, world.interactables);
+      prompt.hidden = !focused;
+      if (focused) prompt.textContent = `E  ${focused.label()}`;
     } else {
       input.consumeLook();
     }
     player.animate(dt, speed);
-    world.update(time);
+    world.update(time, dt);
 
-    // Câmera segue com suavidade (amortecimento exponencial, independe do fps).
-    target.set(player.root.position.x, HEAD_HEIGHT, player.root.position.z);
-    const o = orbitPosition(target, yaw, pitch, CAMERA_DISTANCE);
-    desired.set(o.x, Math.max(0.4, o.y), o.z);
-    camera.position.lerp(desired, 1 - Math.exp(-dt * 12));
+    target.lerp(follow.set(pos.x, HEAD_HEIGHT, pos.z), 1 - Math.exp(-dt * 14));
+    const ideal = orbitPosition(target, yaw, pitch, CAMERA_DISTANCE);
+    const allowed = cameraDistance(target, ideal, world.colliders());
+    // Aproxima na hora (para não mostrar o outro lado da parede) e se afasta devagar.
+    camDist = allowed < camDist ? allowed : camDist + (allowed - camDist) * (1 - Math.exp(-dt * 4));
+    const o = orbitPosition(target, yaw, pitch, camDist);
+    camera.position.set(o.x, Math.max(0.3, o.y), o.z);
     camera.lookAt(target);
+    player.root.visible = camDist > HIDE_PLAYER_BELOW;
 
     renderer.render(scene, camera);
   };
-  camera.position.copy(orbitPosition(new THREE.Vector3(world.spawn.x, HEAD_HEIGHT, world.spawn.z), yaw, pitch, CAMERA_DISTANCE));
   tick();
 
   if (import.meta.env.DEV) {
-    // Gancho só de desenvolvimento, para os testes de navegador lerem o estado.
+    // Gancho só de desenvolvimento, para os testes de navegador lerem e
+    // posicionarem o estado (o navegador de teste roda a poucos quadros/s).
     (window as unknown as Record<string, unknown>).__pericia3d = {
       get player() {
         return { x: player.root.position.x, z: player.root.position.z };
       },
       get mode() {
         return mode;
+      },
+      get camDist() {
+        return camDist;
+      },
+      get focused() {
+        return focused?.id ?? null;
+      },
+      place(x: number, z: number, viewYaw = yaw, viewPitch = pitch) {
+        player.root.position.set(x, 0, z);
+        target.set(x, HEAD_HEIGHT, z);
+        yaw = viewYaw;
+        pitch = viewPitch;
       },
       info: renderer.info,
     };

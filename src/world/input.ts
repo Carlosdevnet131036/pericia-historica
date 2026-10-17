@@ -6,7 +6,7 @@ import type { MoveInput } from './motion';
  * O mouse usa pointer lock; se o navegador recusar, cai para "arrastar para
  * olhar".
  */
-export type Action = 'forward' | 'back' | 'left' | 'right' | 'run' | 'pause';
+export type Action = 'forward' | 'back' | 'left' | 'right' | 'run' | 'pause' | 'interact';
 
 export const DEFAULT_KEYS: Record<string, Action> = {
   KeyW: 'forward',
@@ -20,7 +20,14 @@ export const DEFAULT_KEYS: Record<string, Action> = {
   ShiftLeft: 'run',
   ShiftRight: 'run',
   Escape: 'pause',
+  KeyE: 'interact',
 };
+
+/** Ações de um toque só (não ficam "seguradas" como as de movimento). */
+export interface InputHandlers {
+  pause?(): void;
+  interact?(): void;
+}
 
 export class Input {
   readonly move: MoveInput = { forward: false, back: false, left: false, right: false, run: false };
@@ -33,8 +40,8 @@ export class Input {
 
   constructor(
     private readonly surface: HTMLElement,
+    private readonly handlers: InputHandlers = {},
     private readonly keys: Record<string, Action> = DEFAULT_KEYS,
-    private readonly onPause: () => void = () => {},
   ) {
     const opts = { signal: this.abort.signal };
     window.addEventListener('keydown', (e) => this.key(e, true), opts);
@@ -81,8 +88,9 @@ export class Input {
   private key(e: KeyboardEvent, down: boolean): void {
     const action = this.keys[e.code];
     if (!action) return;
-    if (action === 'pause') {
-      if (down) this.onPause();
+    if (action === 'pause' || action === 'interact') {
+      // Segurar a tecla gera repetições; a ação dispara uma vez por toque.
+      if (down && !e.repeat) this.handlers[action]?.();
       return;
     }
     e.preventDefault();
