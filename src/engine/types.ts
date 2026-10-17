@@ -15,6 +15,23 @@ export const STEPS: { id: Step; label: string }[] = [
   { id: 'revelacao', label: 'O que aconteceu' },
 ];
 
+/** Cenas ilustradas dos lugares (desenhadas em ui/art/scenes.ts). */
+export type SceneId =
+  | 'casa'
+  | 'delegacia'
+  | 'campo'
+  | 'cidade'
+  | 'litoral'
+  | 'cemiterio'
+  | 'laboratorio'
+  | 'ravina'
+  | 'posto'
+  | 'arquivo'
+  | 'jornais';
+
+/** Capas dos casos (desenhadas em ui/art/covers.ts). */
+export type CoverId = 'digital' | 'banheira' | 'escada' | 'cranio' | 'larva';
+
 export type SourceKind = 'museu' | 'acadêmico' | 'livro' | 'jornalístico' | 'enciclopédia' | 'jurídico';
 
 export interface Source {
@@ -41,6 +58,8 @@ export interface Location {
   id: string;
   name: string;
   blurb: string;
+  /** Ilustração do lugar, desenhada quando o jogador o abre. */
+  scene: SceneId;
   evidenceIds: string[];
 }
 
@@ -292,6 +311,8 @@ export interface CaseFile {
   year: number;
   date: string;
   technique: string;
+  /** Ilustração de capa: o objeto que resume o caso. */
+  cover: CoverId;
   playerRole: string;
   intro: string[];
   dispatch: { header: string; body: string };

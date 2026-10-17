@@ -17,6 +17,7 @@ export const lindbergh1932: CaseFile = {
   year: 1932,
   date: 'Março de 1932 a abril de 1936',
   technique: 'Rastreio de cédulas e análise de madeira (Arthur Koehler)',
+  cover: 'escada',
   playerRole:
     'Você trabalha com Arthur Koehler no Laboratório de Produtos Florestais, em Madison, e acompanha também o rastreio das notas do resgate.',
   intro: [
@@ -38,24 +39,28 @@ export const lindbergh1932: CaseFile = {
       id: 'hopewell',
       name: 'Hopewell, Nova Jersey · março de 1932',
       blurb: 'A casa da família e o que foi deixado do lado de fora.',
+      scene: 'casa',
       evidenceIds: ['sequestro', 'escada', 'maio'],
     },
     {
       id: 'cemiterio',
       name: 'Cemitério de St. Raymond, Bronx · abril de 1932',
       blurb: 'Onde o resgate foi entregue.',
+      scene: 'cemiterio',
       evidenceIds: ['condon'],
     },
     {
       id: 'madison',
       name: 'Laboratório de Produtos Florestais, Madison',
       blurb: 'Onde a escada é desmontada peça por peça.',
+      scene: 'laboratorio',
       evidenceIds: ['koehler'],
     },
     {
       id: 'posto',
       name: 'Nova York · setembro de 1934',
       blurb: 'Dois anos e meio depois, uma nota de dez dólares.',
+      scene: 'posto',
       evidenceIds: ['frentista', 'garagem'],
     },
   ],

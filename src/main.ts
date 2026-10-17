@@ -11,7 +11,7 @@ import { investigacao } from './ui/screens/investigacao';
 import { laboratorio } from './ui/screens/laboratorio';
 import { revelacao } from './ui/screens/revelacao';
 import { treino } from './ui/screens/treino';
-import { caseChanged } from './ui/view-state';
+import { caseChanged, firstTime } from './ui/view-state';
 
 const SCREENS: Record<Step, Screen> = { expediente, investigacao, treino, laboratorio, acusacao, revelacao };
 
@@ -83,10 +83,27 @@ function render(): void {
     h('main', { class: 'page' }, body),
     h('footer', { class: 'colophon' }, 'Baseado em fatos documentados. Elementos dramatizados são sinalizados em cada caso.'),
   );
+  stamp(view);
   if (focusedId) document.getElementById(focusedId)?.focus();
   if (view !== lastView) {
     window.scrollTo({ top: 0 });
     lastView = view;
+  }
+}
+
+/**
+ * Carimbos: o laudo registrado e a avaliação final ganham um carimbo que
+ * "bate" no papel. A animação roda só na primeira vez em cada caso.
+ */
+function stamp(view: string): void {
+  const caseId = view.split('/')[0];
+  const box = root!.querySelector('.result-box');
+  if (box && !box.querySelector('.stamp')) {
+    box.append(h('span', { class: `stamp${firstTime(`${caseId}:laudo`) ? ' stamp-in' : ''}`, 'aria-hidden': 'true' }, 'Laudo registrado'));
+  }
+  const card = root!.querySelector('.score-card');
+  if (card && !card.querySelector('.stamp')) {
+    card.append(h('span', { class: `stamp${firstTime(`${caseId}:arquivado`) ? ' stamp-in' : ''}`, 'aria-hidden': 'true' }, 'Caso arquivado'));
   }
 }
 

@@ -30,6 +30,7 @@ export const mengele1985: CaseFile = {
   year: 1985,
   date: 'Fevereiro de 1979 a abril de 1992',
   technique: 'Antropologia forense (Muñoz, Snow e Helmer)',
+  cover: 'cranio',
   playerRole:
     'Você integra a equipe do Instituto Médico Legal de São Paulo que recebe, em junho de 1985, uma ossada exumada no cemitério de Embu.',
   intro: [
@@ -51,24 +52,28 @@ export const mengele1985: CaseFile = {
       id: 'alemanha',
       name: 'Günzburg, Alemanha · maio de 1985',
       blurb: 'A cidade natal de Mengele, onde a família tinha uma empresa.',
+      scene: 'cidade',
       evidenceIds: ['cartas'],
     },
     {
       id: 'bertioga',
       name: 'Bertioga · fevereiro de 1979',
       blurb: 'Uma praia do litoral paulista, seis anos antes.',
+      scene: 'litoral',
       evidenceIds: ['afogamento', 'abrigo'],
     },
     {
       id: 'embu',
       name: 'Cemitério de Embu · junho de 1985',
       blurb: 'Um túmulo comum, com um nome austríaco na lápide.',
+      scene: 'cemiterio',
       evidenceIds: ['lapide', 'exumacao'],
     },
     {
       id: 'iml',
       name: 'IML de São Paulo',
       blurb: 'Onde peritos brasileiros, americanos e alemães trabalham juntos.',
+      scene: 'laboratorio',
       evidenceIds: ['equipe'],
     },
   ],

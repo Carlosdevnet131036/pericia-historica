@@ -16,6 +16,7 @@ export const rojas1892: CaseFile = {
   year: 1892,
   date: 'Junho a julho de 1892',
   technique: 'Datiloscopia (sistema de Vucetich)',
+  cover: 'digital',
   playerRole:
     'Você é auxiliar da Oficina de Identificação da polícia da Província de Buenos Aires, em La Plata, onde Juan Vucetich mantém desde 1891 um arquivo de fichas com impressões digitais.',
   intro: [
@@ -37,18 +38,21 @@ export const rojas1892: CaseFile = {
       id: 'rancho',
       name: 'O rancho de Francisca Rojas',
       blurb: 'A casa onde as crianças foram encontradas, já revistada pela polícia local.',
+      scene: 'casa',
       evidenceIds: ['cena', 'mancha'],
     },
     {
       id: 'delegacia',
       name: 'A delegacia de Necochea',
       blurb: 'Onde estão os depoimentos e o detido.',
+      scene: 'delegacia',
       evidenceIds: ['depoimento-rojas', 'depoimento-velazquez', 'relatorio'],
     },
     {
       id: 'vizinhanca',
       name: 'A vizinhança',
       blurb: 'Ranchos espalhados pelos arredores, onde todos se conhecem.',
+      scene: 'campo',
       evidenceIds: ['vizinhos'],
     },
   ],

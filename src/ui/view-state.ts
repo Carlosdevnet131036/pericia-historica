@@ -12,3 +12,15 @@ export function onCaseChange(reset: () => void): void {
 export function caseChanged(): void {
   resets.forEach((r) => r());
 }
+
+const seen = new Set<string>();
+
+/**
+ * true só na primeira vez que a chave aparece. A tela é redesenhada a cada
+ * clique; sem isso, as animações de entrada se repetiriam o tempo todo.
+ */
+export function firstTime(key: string): boolean {
+  if (seen.has(key)) return false;
+  seen.add(key);
+  return true;
+}

@@ -1,6 +1,9 @@
 import type { Evidence } from '../../engine/types';
+import { evidenceIcon } from '../art/icons';
+import { scene } from '../art/scenes';
+import { drawIn } from '../art/svg';
 import { h } from '../dom';
-import { onCaseChange } from '../view-state';
+import { firstTime, onCaseChange } from '../view-state';
 import type { Screen } from './context';
 
 const KIND_LABEL: Record<Evidence['kind'], string> = {
@@ -10,14 +13,14 @@ const KIND_LABEL: Record<Evidence['kind'], string> = {
   objeto: 'Vestígio',
 };
 
-function evidenceCard(e: Evidence): HTMLElement {
+function evidenceCard(e: Evidence, i: number, fresh: boolean): HTMLElement {
   return h(
     'article',
-    { class: 'evidence' },
+    { class: `evidence${fresh ? ' rise' : ''}`, style: `--i:${i + 1}` },
     h(
       'div',
       { class: 'evidence-tags' },
-      h('span', { class: 'tag' }, KIND_LABEL[e.kind]),
+      h('span', { class: 'tag tag-kind' }, evidenceIcon(e.kind), KIND_LABEL[e.kind]),
       h(
         'span',
         { class: e.dramatized ? 'tag tag-dram' : 'tag tag-doc' },
@@ -38,6 +41,9 @@ export const investigacao: Screen = ({ caseFile: c, store }) => {
   const s = store.get();
   const current = c.locations.find((l) => l.id === active) ?? null;
   const allVisited = c.locations.every((l) => s.visited.includes(l.id));
+  const fresh = current ? firstTime(`${c.id}:${current.id}`) : false;
+  const art = current ? scene(current.scene, `Ilustração: ${current.name}`) : null;
+  if (art && fresh) drawIn(art);
 
   const open = (id: string) => {
     active = id;
@@ -73,10 +79,13 @@ export const investigacao: Screen = ({ caseFile: c, store }) => {
         'div',
         { class: 'evidence-list' },
         current
-          ? current.evidenceIds
-              .map((id) => c.evidence.find((e) => e.id === id))
-              .filter((e): e is Evidence => e !== undefined)
-              .map(evidenceCard)
+          ? [
+              h('figure', { class: 'scene-frame' }, art, h('figcaption', {}, current.name)),
+              ...current.evidenceIds
+                .map((id) => c.evidence.find((e) => e.id === id))
+                .filter((e): e is Evidence => e !== undefined)
+                .map((e, i) => evidenceCard(e, i, fresh)),
+            ]
           : h('p', { class: 'empty' }, 'Escolha um lugar para começar.'),
       ),
     ),

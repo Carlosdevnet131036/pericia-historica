@@ -1371,6 +1371,193 @@ a.case-card:hover {
   color: var(--ok);
 }
 
+/* ---------- Ilustrações (gravura) ---------- */
+
+.art {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.art .art-ink {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.art .art-accent {
+  fill: none;
+  stroke: var(--blood);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.art .art-paper {
+  fill: var(--sheet);
+}
+
+.art .hatch-line {
+  stroke: var(--ink-soft);
+  stroke-width: 1;
+  opacity: 0.85;
+}
+
+/* Traço desenhado à tinta: pathLength=1 deixa cada traço com comprimento 1. */
+.art.draw-in .art-ink,
+.art.draw-in .art-accent {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: ink-draw 0.9s ease-out forwards;
+  animation-delay: calc(var(--d, 0) * 1ms);
+}
+
+.art.draw-in .art-hatch {
+  opacity: 0;
+  animation: fade-in 0.6s ease forwards 0.8s;
+}
+
+@keyframes ink-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes fade-in {
+  to {
+    opacity: 1;
+  }
+}
+
+.case-art {
+  display: grid;
+  place-items: center;
+  height: 120px;
+  margin: -18px -20px 6px;
+  border-bottom: 1px solid var(--rule);
+  background: var(--paper);
+  overflow: hidden;
+}
+
+.case-art .cover {
+  width: auto;
+  height: 104px;
+}
+
+.cover-print {
+  height: 112px;
+  width: auto;
+  transform: rotate(-8deg);
+}
+
+.case-card:hover .cover,
+.case-card:hover .cover-print {
+  transform: rotate(-3deg) scale(1.04);
+  transition: transform 0.3s ease;
+}
+
+.opening {
+  display: grid;
+  gap: 18px;
+}
+
+.hero-art {
+  margin: 0;
+  display: grid;
+  place-items: center;
+  background: var(--sheet);
+  border: 1px solid var(--rule);
+  padding: 14px;
+}
+
+.hero-art .cover {
+  max-width: 280px;
+}
+
+.hero-art .cover-print {
+  height: 180px;
+}
+
+.scene-frame {
+  margin: 0;
+  background: var(--sheet);
+  border: 1px solid var(--rule);
+  padding: 10px 14px 8px;
+  display: grid;
+  gap: 4px;
+}
+
+.scene-frame .scene {
+  max-height: 190px;
+}
+
+.scene-frame figcaption {
+  font-family: var(--font-type);
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.icon {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  vertical-align: -2px;
+  margin-right: 4px;
+}
+
+/* Entrada escalonada dos cartões (só na primeira vez). */
+.rise {
+  animation: rise 0.45s ease both;
+  animation-delay: calc(var(--i, 0) * 80ms);
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+/* Carimbo. */
+.result-box,
+.score-card {
+  position: relative;
+}
+
+.stamp {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  padding: 4px 10px;
+  border: 3px double var(--blood);
+  color: var(--blood);
+  font: 700 0.78rem/1.2 var(--font-type);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  transform: rotate(-9deg);
+  opacity: 0.85;
+  pointer-events: none;
+}
+
+.stamp-in {
+  animation: stamp 0.45s cubic-bezier(0.2, 1.4, 0.4, 1) both 0.15s;
+}
+
+@keyframes stamp {
+  from {
+    opacity: 0;
+    transform: rotate(-9deg) scale(2.2);
+  }
+}
+
 /* ---------- Responsivo ---------- */
 
 @media (max-width: 860px) {
@@ -1404,8 +1591,28 @@ a.case-card:hover {
   .score-card {
     transform: none;
   }
+  .rise,
+  .stamp-in,
+  .art.draw-in .art-ink,
+  .art.draw-in .art-accent,
+  .art.draw-in .art-hatch {
+    animation: none;
+    stroke-dasharray: none;
+    opacity: 1;
+  }
 }
 
 .overlay-error.is-ok {
   color: var(--ok);
+}
+
+.result-box > h3 {
+  padding-right: 10rem;
+}
+
+@media (max-width: 520px) {
+  .result-box > h3 {
+    padding-right: 0;
+    padding-top: 2.2rem;
+  }
 }

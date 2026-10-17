@@ -74,7 +74,8 @@ src/
 ├── ui/
 │   ├── modules/        uma tela por técnica (datiloscopia, raciocínio, patologia, cédulas e madeira, antropologia, entomologia)
 │   ├── screens/        etapas comuns a todo caso; treino e laboratório despacham por `kind`
-│   ├── view-state.ts   zera o estado de visualização ao trocar de caso
+│   ├── art/            ilustrações SVG em estilo de gravura (cenas, capas, ícones)
+│   ├── view-state.ts   estado de visualização e controle de animações de primeira vez
 │   ├── dom.ts          helper h() para criar elementos
 │   └── prints.ts       cache de renderização das digitais
 ├── main.ts             rotas por hash (#smith-1915) e render
@@ -86,6 +87,7 @@ Decisões principais:
 - **Sem framework.** Com seis telas e estado pequeno, React ou Vue trariam mais complexidade que benefício (YAGNI). O padrão "estado → render" é o mesmo, então migrar depois é simples.
 - **Casos como dados.** Um caso novo é um arquivo em `src/cases/` que segue `CaseFile`. O motor não conhece nenhum caso específico.
 - **Técnicas como módulos.** Treino e laboratório são *unions discriminadas* pelo campo `kind`. Uma técnica nova é um tipo novo em `types.ts`, uma tela em `ui/modules/` e um `case` a mais em cada `switch`; o TypeScript aponta os `switch` que ficaram sem tratar o tipo novo.
+- **Ilustrações no código.** As cenas e capas são SVG desenhado à mão em `ui/art/`, com cores do tema (claro e escuro) e sem dependência de imagens externas ou de direitos autorais. A animação de traço usa `pathLength=1` e `stroke-dashoffset`, e roda só na primeira vez que cada elemento aparece; com `prefers-reduced-motion`, nada se move.
 - **Ciência isolada da UI.** `forensics/` não toca no DOM, exceto na função de render, por isso dá para testar com Vitest.
 - **Digitais procedurais.** Cada crista é uma curva de nível de um campo escalar; as minúcias são singularidades de fase (±atan2) que criam bifurcações e terminações reais. Um teste verifica que uma volta em torno de uma minúcia soma exatamente 2π à fase.
 

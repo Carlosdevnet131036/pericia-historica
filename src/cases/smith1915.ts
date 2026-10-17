@@ -16,6 +16,7 @@ export const smith1915: CaseFile = {
   year: 1915,
   date: 'Julho de 1912 a julho de 1915',
   technique: 'Patologia forense (Bernard Spilsbury)',
+  cover: 'banheira',
   playerRole:
     'Você é um jovem detetive da Polícia Metropolitana designado para ajudar o inspetor Arthur Neil, que recebeu duas cartas com recortes de jornal sobre mortes no banho.',
   intro: [
@@ -37,24 +38,28 @@ export const smith1915: CaseFile = {
       id: 'highgate',
       name: 'Highgate, Londres · dezembro de 1914',
       blurb: 'A morte mais recente, noticiada pelos jornais.',
+      scene: 'cidade',
       evidenceIds: ['jornal', 'lofty'],
     },
     {
       id: 'blackpool',
       name: 'Blackpool · dezembro de 1913',
       blurb: 'Uma pensão à beira-mar e um pai que não esqueceu a filha.',
+      scene: 'litoral',
       evidenceIds: ['burnham', 'cartas'],
     },
     {
       id: 'herne-bay',
       name: 'Herne Bay · julho de 1912',
       blurb: 'A primeira morte, dois anos antes de alguém desconfiar.',
+      scene: 'casa',
       evidenceIds: ['mundy', 'french'],
     },
     {
       id: 'yard',
       name: 'Scotland Yard',
       blurb: 'Onde os registros de casamento são cruzados.',
+      scene: 'arquivo',
       evidenceIds: ['nomes'],
     },
   ],

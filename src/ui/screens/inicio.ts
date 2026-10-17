@@ -2,7 +2,9 @@ import { CASES, PLANNED } from '../../cases';
 import { computeScore } from '../../engine/scoring';
 import { loadSaved } from '../../engine/state';
 import { STEPS, type CaseFile } from '../../engine/types';
+import { cover } from '../art/covers';
 import { h } from '../dom';
+import { firstTime } from '../view-state';
 
 function status(c: CaseFile): string {
   const s = loadSaved(c.id);
@@ -16,6 +18,7 @@ function status(c: CaseFile): string {
 }
 
 export function inicio(): HTMLElement {
+  const fresh = firstTime('inicio');
   return h(
     'section',
     { class: 'screen inicio' },
@@ -33,13 +36,14 @@ export function inicio(): HTMLElement {
     h(
       'ol',
       { class: 'case-list' },
-      ...CASES.map((c) =>
+      ...CASES.map((c, i) =>
         h(
           'li',
-          {},
+          { class: fresh ? 'rise' : '', style: `--i:${i}` },
           h(
             'a',
             { class: 'case-card', href: `#${c.id}` },
+            h('span', { class: 'case-art' }, cover(c.cover, `Ilustração do caso ${c.number}`)),
             h('span', { class: 'case-number' }, `Caso ${c.number}`),
             h('span', { class: 'case-title' }, c.title),
             h('span', { class: 'case-meta' }, `${c.place} · ${c.year}`),

@@ -16,6 +16,7 @@ export const ruxton1935: CaseFile = {
   year: 1935,
   date: 'Setembro de 1935 a maio de 1936',
   technique: 'Entomologia forense (Alexander Mearns)',
+  cover: 'larva',
   playerRole:
     'Você é assistente do professor John Glaister, na Universidade de Glasgow, e recebe os vestígios encontrados perto de Moffat.',
   intro: [
@@ -37,24 +38,28 @@ export const ruxton1935: CaseFile = {
       id: 'moffat',
       name: 'Gardenholme Linn, perto de Moffat · setembro de 1935',
       blurb: 'Uma ravina ao lado da estrada entre Edimburgo e Carlisle.',
+      scene: 'ravina',
       evidenceIds: ['achado', 'larvas'],
     },
     {
       id: 'embrulho',
       name: 'Os embrulhos',
       blurb: 'Lençóis, roupas e jornais, examinados um a um.',
+      scene: 'jornais',
       evidenceIds: ['jornais', 'roupas'],
     },
     {
       id: 'lancaster',
       name: 'Lancaster, Dalton Square',
       blurb: 'A casa de um médico conhecido na cidade.',
+      scene: 'cidade',
       evidenceIds: ['desaparecidas', 'casa'],
     },
     {
       id: 'universidades',
       name: 'Universidades de Glasgow e Edimburgo',
       blurb: 'Onde anatomistas e legistas montam o quebra-cabeça.',
+      scene: 'laboratorio',
       evidenceIds: ['especialistas'],
     },
   ],
