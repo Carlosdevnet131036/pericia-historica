@@ -4,6 +4,8 @@
 
 Jogo de investigação no navegador baseado em **casos criminais reais resolvidos pela perícia**. Cada caso apresenta uma técnica forense que nasceu ou se firmou naquele caso. O jogador aprende a técnica, investiga, faz o confronto no laboratório e só depois vê o que realmente aconteceu, com as fontes.
 
+**Jogue agora:** https://carlosdevnet131036.github.io/pericia-historica/
+
 ## Casos
 
 | # | Caso | Ano | Técnica | Status |
@@ -40,6 +42,7 @@ A cada push na `main` e em todo pull request, o GitHub Actions (`.github/workflo
 |-----|----------------|--------------|
 | `verificar` (Node 22 e 24) | `npm ci`, typecheck, testes e build | Erro de tipo, teste quebrado ou build com erro |
 | `auditoria` | `npm audit --audit-level=high` | Vulnerabilidade alta ou crítica nas dependências |
+| `publicar` (só na `main`) | Publica `dist/` no GitHub Pages | Roda apenas se os dois jobs acima passarem |
 
 O build do Node 22 fica disponível por 7 dias como artefato `dist` na página da execução. O Dependabot (`.github/dependabot.yml`) abre PRs semanais com atualizações, e cada PR passa pelo mesmo pipeline antes do merge.
 
