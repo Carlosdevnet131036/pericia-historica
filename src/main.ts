@@ -19,6 +19,9 @@ const SCREENS: Record<Step, Screen> = { expediente, investigacao, treino, labora
 const root = document.getElementById('app');
 if (!root) throw new Error('#app não encontrado');
 
+/** Mundo 3D montado agora (só no modo de exploração). */
+let world: { dispose(): void } | null = null;
+
 /** Caso aberto agora e o store dele; null na tela inicial. */
 let current: { caseFile: CaseFile; store: Store; unsubscribe: () => void } | null = null;
 let lastView = '';
@@ -110,14 +113,31 @@ function stamp(view: string): void {
   }
 }
 
-/** A rota é só o id do caso no hash (#smith-1915); vazio = tela inicial. */
+/**
+ * Rotas por hash: vazio = tela inicial; #smith-1915 = caso; #rojas-1892/3d =
+ * exploração 3D do caso (só para lugares marcados com explore3d).
+ */
 function route(): void {
-  const id = location.hash.slice(1);
-  if (current?.caseFile.id === id) return;
+  const [id = '', mode] = location.hash.slice(1).split('/');
+  world?.dispose();
+  world = null;
+  const caseFile = findCase(id);
+
+  if (caseFile && mode === '3d' && caseFile.locations.some((l) => l.explore3d)) {
+    current?.unsubscribe();
+    current = null;
+    caseChanged();
+    void open3d(caseFile);
+    return;
+  }
+
+  if (current?.caseFile.id === id && !mode) {
+    render();
+    return;
+  }
   current?.unsubscribe();
   current = null;
   caseChanged();
-  const caseFile = findCase(id);
   if (caseFile) {
     const store = new Store(caseFile.id);
     current = { caseFile, store, unsubscribe: store.subscribe(render) };
@@ -126,6 +146,37 @@ function route(): void {
     document.title = 'Perícia Histórica';
   }
   render();
+}
+
+/** Carrega o Three.js sob demanda; sem WebGL, explica e oferece a versão 2D. */
+async function open3d(caseFile: CaseFile): Promise<void> {
+  const place = caseFile.locations.find((l) => l.explore3d);
+  const back = `#${caseFile.id}`;
+  root!.replaceChildren(h('p', { class: 'world-loading' }, 'Carregando o cenário 3D…'));
+  try {
+    const mod = await import('./world');
+    if (location.hash !== `#${caseFile.id}/3d`) return; // o jogador saiu durante o carregamento
+    if (!mod.webglAvailable()) throw new Error('webgl');
+    document.title = `${place?.name ?? caseFile.title} (3D) · Perícia Histórica`;
+    world = mod.mountWorld(root!, { caseTitle: `Caso ${caseFile.number} · ${caseFile.title}`, locationName: place?.name ?? '', backHref: back });
+  } catch (err) {
+    const noWebgl = err instanceof Error && err.message === 'webgl';
+    root!.replaceChildren(
+      h(
+        'section',
+        { class: 'page world-error' },
+        h('h2', {}, 'Não foi possível abrir o modo 3D'),
+        h(
+          'p',
+          { class: 'lede' },
+          noWebgl
+            ? 'Este navegador ou computador não oferece WebGL, necessário para o 3D. O caso continua jogável na versão 2D.'
+            : 'O cenário não carregou. Verifique a conexão e tente de novo; o caso continua jogável na versão 2D.',
+        ),
+        h('a', { class: 'btn primary', href: back }, 'Voltar para a versão 2D'),
+      ),
+    );
+  }
 }
 
 window.addEventListener('hashchange', route);

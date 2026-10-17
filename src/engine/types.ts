@@ -85,6 +85,8 @@ export interface Location {
   blurb: string;
   /** Ilustração do lugar, desenhada quando o jogador o abre. */
   scene: SceneId;
+  /** O lugar tem versão explorável em 3D (protótipo). */
+  explore3d?: boolean;
   /** Cena de objetos escondidos; completá-la libera as evidências do lugar. */
   search?: {
     targets: ObjectId[];

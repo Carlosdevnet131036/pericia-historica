@@ -39,6 +39,21 @@ npm test           # testes unitários (Vitest)
 npm run build      # typecheck + build de produção em dist/
 ```
 
+## Modo 3D (protótipo, em desenvolvimento)
+
+O rancho do Caso 1 pode ser explorado em 3D, em terceira pessoa: botão "Explorar este lugar em 3D" na investigação, ou `#rojas-1892/3d`. Requer computador com teclado, mouse e WebGL; sem WebGL, o jogo explica e volta para a versão 2D.
+
+| Tecla | Ação |
+|---|---|
+| W A S D ou setas | Andar |
+| Shift | Correr |
+| Mouse | Olhar (clique para capturar o cursor; se o navegador recusar, arraste) |
+| Esc | Pausar |
+
+Arquitetura: `src/world/` é a única parte que importa o Three.js e é carregada por `import()` dinâmico, então o jogo 2D não baixa o 3D. A matemática de movimento e câmera (`world/motion.ts`) não depende do Three.js e é testada com Vitest. Modelos, texturas e cenário são gerados em código (sem arquivos externos nem licenças a conferir). O rancho é uma reconstrução dramatizada da arquitetura rural do pampa em 1892.
+
+Etapas: 1. personagem, câmera e cenário navegável (feito) · 2. colisões e interação com um objeto · 3. os 8 objetos da busca e os 2 cartões do rancho no 3D, com diário · 4. demais lugares e sistemas narrativos.
+
 ## Integração contínua
 
 A cada push na `main` e em todo pull request, o GitHub Actions (`.github/workflows/ci.yml`) roda:
@@ -82,7 +97,8 @@ src/
 │   ├── view-state.ts   estado de visualização e controle de animações de primeira vez
 │   ├── dom.ts          helper h() para criar elementos
 │   └── prints.ts       cache de renderização das digitais
-├── main.ts             rotas por hash (#smith-1915) e render
+├── world/              modo 3D (Three.js, carregado sob demanda)
+├── main.ts             rotas por hash (#smith-1915, #rojas-1892/3d) e render
 └── styles.css
 ```
 

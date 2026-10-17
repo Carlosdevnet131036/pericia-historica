@@ -39,6 +39,7 @@ export const rojas1892: CaseFile = {
       name: 'O rancho de Francisca Rojas',
       blurb: 'A casa onde as crianças foram encontradas, já revistada pela polícia local.',
       scene: 'casa',
+      explore3d: true,
       search: { targets: ['lamparina', 'chave', 'xicara', 'vela', 'chapeu', 'moeda', 'pente', 'botao'], clutter: 20, seed: 1892 },
       evidenceIds: ['cena', 'mancha'],
     },

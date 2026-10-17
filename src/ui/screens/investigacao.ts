@@ -108,7 +108,17 @@ export const investigacao: Screen = (ctx) => {
         !current
           ? h('p', { class: 'empty' }, 'Escolha um lugar para começar.')
           : current.search
-            ? [searchPanel(ctx, current), ...(searchDone ? cards : [])]
+            ? [
+                current.explore3d
+                  ? h(
+                      'a',
+                      { class: 'btn ghost explore3d', href: `#${c.id}/3d` },
+                      'Explorar este lugar em 3D (protótipo, computador com teclado e mouse)',
+                    )
+                  : null,
+                searchPanel(ctx, current),
+                ...(searchDone ? cards : []),
+              ]
             : [h('figure', { class: 'scene-frame' }, art, h('figcaption', {}, current.name)), ...cards],
       ),
     ),
