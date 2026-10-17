@@ -1,0 +1,20 @@
+version: 2
+updates:
+  # Abre PRs semanais com atualizações das dependências npm.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      ferramentas-dev:
+        dependency-type: development
+    # Só propõe versões publicadas há pelo menos 14 dias.
+    cooldown:
+      default-days: 14
+
+  # Mantém as actions do workflow (checkout, setup-node...) atualizadas.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
