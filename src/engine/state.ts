@@ -12,7 +12,7 @@ export function initialState(caseId: string): GameState {
     reached: ['expediente'],
     visited: [],
     training: { answers: {}, firstTry: {} },
-    lab: { marks: {}, verdicts: {}, features: [], hypothesis: null, submitted: false },
+    lab: { marks: {}, verdicts: {}, features: [], hypothesis: null, bills: [], lead: null, align: {}, submitted: false },
     accusation: { answers: {}, submitted: false },
   };
 }
@@ -23,7 +23,10 @@ export function loadSaved(caseId: string): GameState | null {
     const raw = localStorage.getItem(KEY_PREFIX + caseId);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as GameState;
-    return parsed.version === 2 && parsed.caseId === caseId ? parsed : null;
+    if (parsed.version !== 2 || parsed.caseId !== caseId) return null;
+    // Campos novos ganham o valor padrão; assim um save antigo continua válido.
+    const base = initialState(caseId);
+    return { ...base, ...parsed, lab: { ...base.lab, ...parsed.lab } };
   } catch {
     return null;
   }

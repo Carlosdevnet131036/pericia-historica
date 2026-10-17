@@ -12,6 +12,10 @@
   --warn: #9a6a1c;
   --water: rgb(64 120 170 / 0.38);
   --water-line: #3d6f9e;
+  --wood: #d9b98a;
+  --wood-rail: #c99b62;
+  --grain: #8a6236;
+  --joist: #bfae90;
   --font-display: 'Old Standard TT', 'Times New Roman', Georgia, serif;
   --font-body: 'Source Serif 4', Georgia, 'Times New Roman', serif;
   --font-type: 'Courier Prime', 'Courier New', ui-monospace, monospace;
@@ -32,6 +36,10 @@
     --warn: #e0b061;
     --water: rgb(110 160 210 / 0.35);
     --water-line: #8fb6dc;
+    --wood: #7a5c38;
+    --wood-rail: #9a7346;
+    --grain: #e2c79f;
+    --joist: #4f4536;
     color-scheme: dark;
   }
 }
@@ -48,6 +56,10 @@
   --warn: #e0b061;
   --water: rgb(110 160 210 / 0.35);
   --water-line: #8fb6dc;
+  --wood: #7a5c38;
+  --wood-rail: #9a7346;
+  --grain: #e2c79f;
+  --joist: #4f4536;
   color-scheme: dark;
 }
 
@@ -1079,6 +1091,114 @@ a.case-card:hover {
 
 .readout dd {
   margin: 0;
+}
+
+/* ---------- Laboratório de cédulas e madeira ---------- */
+
+.ransom-list {
+  background: var(--paper);
+  border: 1px dashed var(--rule);
+  padding: 10px 14px;
+  display: grid;
+  gap: 6px;
+}
+
+.ransom-list ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  font-family: var(--font-type);
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.serial,
+.chip.mono {
+  font-family: var(--font-type);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+.bills-table td {
+  font-size: 0.9rem;
+}
+
+.wood-stage {
+  border: 1px solid var(--rule);
+  background: var(--paper);
+  padding: 8px;
+  overflow-x: auto;
+}
+
+.wood-svg {
+  display: block;
+  width: 100%;
+  min-width: 620px;
+  height: auto;
+}
+
+.joist {
+  fill: var(--joist);
+}
+
+.nail-hole,
+.rail-hole {
+  fill: var(--ink);
+}
+
+.wall {
+  stroke: var(--ink);
+  stroke-width: 1.4;
+}
+
+.board {
+  fill: var(--wood);
+}
+
+.rail-body {
+  fill: var(--wood-rail);
+  stroke: var(--ink);
+  stroke-width: 0.4;
+}
+
+.grain {
+  fill: none;
+  stroke: var(--grain);
+  stroke-width: 0.45;
+}
+
+.wood-label {
+  font: 4px var(--font-type);
+  fill: var(--ink-soft);
+}
+
+.wood-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+}
+
+.wood-controls input[type='range'] {
+  flex: 1 1 220px;
+  accent-color: var(--stamp);
+}
+
+.offset-value {
+  font-family: var(--font-type);
+  font-variant-numeric: tabular-nums;
+  min-width: 5.5em;
+}
+
+.readout dd.is-ok {
+  color: var(--ok);
+}
+
+.readout dd.is-wrong {
+  color: var(--blood);
 }
 
 /* ---------- Responsivo ---------- */

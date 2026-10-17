@@ -1,5 +1,6 @@
 import type { FingerprintSpec, PatternType, View } from '../forensics/fingerprint';
 import type { Verdict } from '../forensics/match';
+import type { WoodSetup } from '../forensics/wood';
 
 export type Step = 'expediente' | 'investigacao' | 'treino' | 'laboratorio' | 'acusacao' | 'revelacao';
 
@@ -157,7 +158,49 @@ export interface PathologyLab {
   };
 }
 
-export type LabModule = FingerprintLab | PathologyLab;
+export interface Bill {
+  id: string;
+  serial: string;
+  denomination: number;
+  kind: 'certificado-ouro' | 'nota-federal';
+  where: string;
+  date: string;
+  /** Anotação feita por quem recebeu a nota (frentista, caixa de banco). */
+  note?: string;
+}
+
+export interface WoodCandidate {
+  id: string;
+  name: string;
+  description: string;
+  grainSeed: number;
+  /** A tábua está pregada sobre vigas (piso) ou solta (depósito)? */
+  joists: boolean;
+}
+
+export interface MoneyWoodLab {
+  kind: 'cedulas-madeira';
+  title: string;
+  lede: string;
+  bills: {
+    title: string;
+    lede: string;
+    ransomList: string[];
+    ledger: Bill[];
+    leadQuestion: string;
+    leadBillId: string;
+    leadExplanation: string;
+  };
+  wood: {
+    title: string;
+    lede: string;
+    setup: WoodSetup;
+    candidates: WoodCandidate[];
+    explanation: string;
+  };
+}
+
+export type LabModule = FingerprintLab | PathologyLab | MoneyWoodLab;
 
 /* ---------- Caso ---------- */
 
@@ -209,6 +252,11 @@ export interface GameState {
     /** Patologia: características marcadas no quadro e hipótese escolhida. */
     features: string[];
     hypothesis: string | null;
+    /** Cédulas: notas marcadas como do resgate e a nota que leva ao suspeito. */
+    bills: string[];
+    lead: string | null;
+    /** Madeira: posição do trilho em cada tábua candidata. */
+    align: Record<string, { offset: number; flip: boolean }>;
     submitted: boolean;
   };
   accusation: {

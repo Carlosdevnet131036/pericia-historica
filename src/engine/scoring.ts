@@ -1,5 +1,6 @@
 import { checkMarks, expectedVerdict } from '../forensics/match';
-import type { CaseFile, FingerprintLab, GameState, PathologyLab } from './types';
+import { compare, isFullMatch } from '../forensics/wood';
+import type { CaseFile, FingerprintLab, GameState, MoneyWoodLab, PathologyLab } from './types';
 
 export interface ScoreLine {
   label: string;
@@ -41,12 +42,39 @@ function pathologyLabScore(lab: PathologyLab, s: GameState): ScoreLine {
   return { label: 'Quadro e simulação', points: featurePoints + bathPoints, max: lab.pattern.features.length + 3 };
 }
 
+/**
+ * Cédulas e madeira: 1 ponto por nota classificada corretamente, 2 pela nota
+ * que leva ao suspeito, 2 por conclusão correta em cada tábua e 2 por deixar
+ * o trilho na posição exata na tábua de origem.
+ */
+function moneyWoodLabScore(lab: MoneyWoodLab, s: GameState): ScoreLine {
+  const ransom = new Set(lab.bills.ransomList);
+  const marked = new Set(s.lab.bills);
+  let points = lab.bills.ledger.filter((b) => marked.has(b.id) === ransom.has(b.serial)).length;
+  let max = lab.bills.ledger.length + 2;
+  if (s.lab.lead === lab.bills.leadBillId) points += 2;
+  const { setup } = lab.wood;
+  for (const cand of lab.wood.candidates) {
+    const isSource = cand.grainSeed === setup.railSourceSeed;
+    max += 2;
+    if (s.lab.verdicts[cand.id] === (isSource ? 'identificada' : 'excluida')) points += 2;
+    if (isSource) {
+      max += 2;
+      const placement = s.lab.align[cand.id];
+      if (placement && isFullMatch(compare(setup, cand.grainSeed, cand.joists, placement))) points += 2;
+    }
+  }
+  return { label: 'Cédulas e madeira', points, max };
+}
+
 export function labScore(c: CaseFile, s: GameState): ScoreLine {
   switch (c.lab.kind) {
     case 'confronto-digital':
       return fingerprintLabScore(c.lab, s);
     case 'patologia-banho':
       return pathologyLabScore(c.lab, s);
+    case 'cedulas-madeira':
+      return moneyWoodLabScore(c.lab, s);
   }
 }
 

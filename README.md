@@ -12,7 +12,7 @@ Jogo de investigação no navegador baseado em **casos criminais reais resolvido
 |---|------|-----|---------|--------|
 | 1 | Francisca Rojas, Necochea (Argentina) | 1892 | Datiloscopia (Vucetich) | Jogável |
 | 2 | "Brides in the Bath", G. J. Smith (Inglaterra) | 1915 | Patologia forense (Spilsbury) | Jogável |
-| 3 | Sequestro Lindbergh (EUA) | 1932 | Madeira e rastreio de dinheiro | Planejado |
+| 3 | Sequestro Lindbergh (EUA) | 1932 | Rastreio de cédulas e madeira (Koehler) | Jogável |
 | 4 | Buck Ruxton (Escócia) | 1935 | Antropologia forense | Planejado |
 | 5 | Unabomber (EUA) | 1996 | Linguística forense | Planejado |
 
@@ -53,7 +53,8 @@ src/
 ├── cases/              dados de cada caso (texto, módulos de perícia, fontes)
 │   ├── index.ts        lista de casos jogáveis e planejados
 │   ├── rojas1892.ts
-│   └── smith1915.ts
+│   ├── smith1915.ts
+│   └── lindbergh1932.ts
 ├── engine/             regras independentes de UI
 │   ├── types.ts        contrato de um caso (CaseFile) e do estado (GameState)
 │   ├── state.ts        store imutável + persistência em localStorage
@@ -61,9 +62,10 @@ src/
 ├── forensics/          "ciência" do jogo, funções puras e testadas
 │   ├── fingerprint.ts  gerador procedural de digitais
 │   ├── match.ts        confronto de minúcias
-│   └── bath.ts         geometria do corpo na banheira
+│   ├── bath.ts         geometria do corpo na banheira
+│   └── wood.ts         veios, furos de prego e encaixe de tábuas
 ├── ui/
-│   ├── modules/        uma tela por técnica (datiloscopia, raciocínio, patologia)
+│   ├── modules/        uma tela por técnica (datiloscopia, raciocínio, patologia, cédulas e madeira)
 │   ├── screens/        etapas comuns a todo caso; treino e laboratório despacham por `kind`
 │   ├── view-state.ts   zera o estado de visualização ao trocar de caso
 │   ├── dom.ts          helper h() para criar elementos

@@ -1,12 +1,12 @@
 import type { CaseFile } from '../engine/types';
+import { lindbergh1932 } from './lindbergh1932';
 import { rojas1892 } from './rojas1892';
 import { smith1915 } from './smith1915';
 
-export const CASES: CaseFile[] = [rojas1892, smith1915];
+export const CASES: CaseFile[] = [rojas1892, smith1915, lindbergh1932];
 
 /** Casos já pesquisados e planejados, mostrados como "em preparação". */
 export const PLANNED: { number: number; title: string; place: string; year: number; technique: string }[] = [
-  { number: 3, title: 'O sequestro Lindbergh', place: 'Nova Jersey, EUA', year: 1932, technique: 'Análise de madeira e rastreio de dinheiro' },
   { number: 4, title: 'O caso Ruxton', place: 'Lancaster, Inglaterra', year: 1935, technique: 'Antropologia forense' },
   { number: 5, title: 'O manifesto', place: 'EUA', year: 1996, technique: 'Linguística forense' },
 ];
