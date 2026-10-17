@@ -6,9 +6,12 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    # Atualizações minor e patch vêm juntas num PR só. Cada major vem em
+    # PR separado, para que uma quebra tenha um único suspeito.
     groups:
       ferramentas-dev:
         dependency-type: development
+        update-types: [minor, patch]
     # Só propõe versões publicadas há pelo menos 14 dias.
     cooldown:
       default-days: 14
