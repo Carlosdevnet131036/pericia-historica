@@ -12,6 +12,7 @@ import { laboratorio } from './ui/screens/laboratorio';
 import { revelacao } from './ui/screens/revelacao';
 import { treino } from './ui/screens/treino';
 import { caseChanged, firstTime } from './ui/view-state';
+import { partnerBubble } from './ui/components/caso';
 
 const SCREENS: Record<Step, Screen> = { expediente, investigacao, treino, laboratorio, acusacao, revelacao };
 
@@ -71,7 +72,9 @@ function render(): void {
       ),
       stepper(store, s.step, s.reached),
     );
-    body = SCREENS[s.step]({ caseFile, store });
+    const screen = SCREENS[s.step]({ caseFile, store });
+    const bubble = partnerBubble(caseFile, s.step);
+    body = bubble ? h('div', { class: 'with-partner' }, bubble, screen) : screen;
   } else {
     view = 'inicio';
     header = h('header', { class: 'masthead' }, h('div', { class: 'brand' }, h('a', { class: 'brand-name', href: '#' }, 'Perícia Histórica')));

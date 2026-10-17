@@ -1,3 +1,4 @@
+import { suspectsBoard } from '../components/caso';
 import { h } from '../dom';
 import type { Screen } from './context';
 
@@ -14,6 +15,7 @@ export const acusacao: Screen = ({ caseFile: c, store }) => {
     { class: 'screen acusacao' },
     h('h2', {}, 'Conclusão do inspetor'),
     h('p', { class: 'lede' }, 'Com o laudo em mãos, responda o que a prova permite afirmar. Depois de enviar, as respostas ficam registradas.'),
+    suspectsBoard(c, s),
     h(
       'ol',
       { class: 'questions' },

@@ -4,6 +4,8 @@
 
 Jogo de investigação no navegador baseado em **casos criminais reais resolvidos pela perícia**. Cada caso apresenta uma técnica forense que nasceu ou se firmou naquele caso. O jogador aprende a técnica, investiga, faz o confronto no laboratório e só depois vê o que realmente aconteceu, com as fontes.
 
+Inspirado na estrutura de jogos de investigação como Criminal Case: cenas de objetos escondidos com estrelas, um parceiro que comenta cada etapa e um quadro de suspeitos com o perfil do responsável. O Caso 1 é o piloto desse formato.
+
 **Jogue agora:** https://carlosdevnet131036.github.io/pericia-historica/
 
 ## Casos
@@ -63,7 +65,8 @@ src/
 ├── engine/             regras independentes de UI
 │   ├── types.ts        contrato de um caso (CaseFile) e do estado (GameState)
 │   ├── state.ts        store imutável + persistência em localStorage
-│   └── scoring.ts      pontuação, despachada pelo tipo de cada módulo
+│   ├── scoring.ts      pontuação, despachada pelo tipo de cada módulo
+│   └── search.ts       layout determinístico e estrelas das cenas de busca
 ├── forensics/          "ciência" do jogo, funções puras e testadas
 │   ├── fingerprint.ts  gerador procedural de digitais
 │   ├── match.ts        confronto de minúcias
@@ -74,7 +77,8 @@ src/
 ├── ui/
 │   ├── modules/        uma tela por técnica (datiloscopia, raciocínio, patologia, cédulas e madeira, antropologia, entomologia)
 │   ├── screens/        etapas comuns a todo caso; treino e laboratório despacham por `kind`
-│   ├── art/            ilustrações SVG em estilo de gravura (cenas, capas, ícones)
+│   ├── art/            ilustrações SVG em estilo de gravura (cenas, capas, ícones, objetos)
+│   ├── components/     parceiro e quadro de suspeitos
 │   ├── view-state.ts   estado de visualização e controle de animações de primeira vez
 │   ├── dom.ts          helper h() para criar elementos
 │   └── prints.ts       cache de renderização das digitais

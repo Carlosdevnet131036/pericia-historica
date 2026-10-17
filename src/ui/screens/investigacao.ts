@@ -4,6 +4,8 @@ import { scene } from '../art/scenes';
 import { drawIn } from '../art/svg';
 import { h } from '../dom';
 import { firstTime, onCaseChange } from '../view-state';
+import { suspectsBoard } from '../components/caso';
+import { isSearchDone, searchPanel, searchProgress, stars } from '../modules/busca';
 import type { Screen } from './context';
 
 const KIND_LABEL: Record<Evidence['kind'], string> = {
@@ -37,24 +39,49 @@ onCaseChange(() => {
   active = null;
 });
 
-export const investigacao: Screen = ({ caseFile: c, store }) => {
+export const investigacao: Screen = (ctx) => {
+  const { caseFile: c, store } = ctx;
   const s = store.get();
   const current = c.locations.find((l) => l.id === active) ?? null;
   const allVisited = c.locations.every((l) => s.visited.includes(l.id));
-  const fresh = current ? firstTime(`${c.id}:${current.id}`) : false;
-  const art = current ? scene(current.scene, `Ilustração: ${current.name}`) : null;
+  const hasSearch = c.locations.some((l) => l.search);
+  const searchDone = current ? isSearchDone(ctx, current) : false;
+  // Cartões entram animados na primeira vez que ficam visíveis.
+  const fresh = current && searchDone ? firstTime(`${c.id}:${current.id}`) : false;
+  const art = current && !current.search ? scene(current.scene, `Ilustração: ${current.name}`) : null;
   if (art && fresh) drawIn(art);
 
   const open = (id: string) => {
     active = id;
-    store.update((st) => (st.visited.includes(id) ? { ...st } : { ...st, visited: [...st.visited, id] }));
+    const loc = c.locations.find((l) => l.id === id);
+    // Lugares com cena de busca só contam como visitados quando a cena é completada.
+    store.update((st) => (st.visited.includes(id) || loc?.search ? { ...st } : { ...st, visited: [...st.visited, id] }));
   };
+
+  const stateLabel = (l: (typeof c.locations)[number]) => {
+    if (!l.search) return s.visited.includes(l.id) ? 'Visitado' : 'Não visitado';
+    const best = searchProgress(ctx, l).bestStars;
+    return best ? stars(best) : 'Não investigado';
+  };
+
+  const cards = current
+    ? current.evidenceIds
+        .map((id) => c.evidence.find((e) => e.id === id))
+        .filter((e): e is Evidence => e !== undefined)
+        .map((e, i) => evidenceCard(e, i, fresh))
+    : [];
 
   return h(
     'section',
     { class: 'screen investigacao' },
     h('h2', {}, c.copy.investigationTitle),
-    h('p', { class: 'lede' }, `Visite os ${c.locations.length} lugares e leia o que cada um tem. Os cartões dizem o que é fato documentado e o que foi dramatizado.`),
+    h(
+      'p',
+      { class: 'lede' },
+      hasSearch
+        ? `Investigue os ${c.locations.length} lugares: ache os objetos de cada cena para liberar as evidências. Os cartões dizem o que é fato documentado e o que foi dramatizado.`
+        : `Visite os ${c.locations.length} lugares e leia o que cada um tem. Os cartões dizem o que é fato documentado e o que foi dramatizado.`,
+    ),
     h(
       'div',
       { class: 'investigation-layout' },
@@ -71,31 +98,28 @@ export const investigacao: Screen = ({ caseFile: c, store }) => {
             },
             h('span', { class: 'location-name' }, l.name),
             h('span', { class: 'location-blurb' }, l.blurb),
-            h('span', { class: 'location-state' }, s.visited.includes(l.id) ? 'Visitado' : 'Não visitado'),
+            h('span', { class: 'location-state' }, stateLabel(l)),
           ),
         ),
       ),
       h(
         'div',
         { class: 'evidence-list' },
-        current
-          ? [
-              h('figure', { class: 'scene-frame' }, art, h('figcaption', {}, current.name)),
-              ...current.evidenceIds
-                .map((id) => c.evidence.find((e) => e.id === id))
-                .filter((e): e is Evidence => e !== undefined)
-                .map((e, i) => evidenceCard(e, i, fresh)),
-            ]
-          : h('p', { class: 'empty' }, 'Escolha um lugar para começar.'),
+        !current
+          ? h('p', { class: 'empty' }, 'Escolha um lugar para começar.')
+          : current.search
+            ? [searchPanel(ctx, current), ...(searchDone ? cards : [])]
+            : [h('figure', { class: 'scene-frame' }, art, h('figcaption', {}, current.name)), ...cards],
       ),
     ),
+    allVisited ? suspectsBoard(c, s) : null,
     h(
       'div',
       { class: 'actions' },
       h(
         'button',
         { class: 'btn primary', disabled: !allVisited, onclick: () => store.goTo('treino') },
-        allVisited ? c.copy.toTraining : `Visite todos os lugares (${s.visited.length}/${c.locations.length})`,
+        allVisited ? c.copy.toTraining : `${hasSearch ? 'Investigue' : 'Visite'} todos os lugares (${s.visited.length}/${c.locations.length})`,
       ),
     ),
   );

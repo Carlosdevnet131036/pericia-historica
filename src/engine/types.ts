@@ -29,6 +29,31 @@ export type SceneId =
   | 'arquivo'
   | 'jornais';
 
+/** Objetos das cenas de busca (desenhados em ui/art/objects.ts). */
+export type ObjectId =
+  | 'lamparina'
+  | 'chave'
+  | 'livro'
+  | 'xicara'
+  | 'relogio'
+  | 'tesoura'
+  | 'garrafa'
+  | 'chapeu'
+  | 'vela'
+  | 'oculos'
+  | 'moeda'
+  | 'carta'
+  | 'ferradura'
+  | 'pena'
+  | 'botao'
+  | 'fosforos'
+  | 'cachimbo'
+  | 'luva'
+  | 'pente'
+  | 'colher'
+  | 'lupa'
+  | 'cadeado';
+
 /** Capas dos casos (desenhadas em ui/art/covers.ts). */
 export type CoverId = 'digital' | 'banheira' | 'escada' | 'cranio' | 'larva';
 
@@ -60,7 +85,32 @@ export interface Location {
   blurb: string;
   /** Ilustração do lugar, desenhada quando o jogador o abre. */
   scene: SceneId;
+  /** Cena de objetos escondidos; completá-la libera as evidências do lugar. */
+  search?: {
+    targets: ObjectId[];
+    clutter: number;
+    seed: number;
+  };
   evidenceIds: string[];
+}
+
+/** Uma característica do responsável, revelada ao longo do caso. */
+export interface ProfileTrait {
+  id: string;
+  label: string;
+  /** Etapa a partir da qual a característica aparece no quadro. */
+  revealedAt: Step;
+  source: string;
+}
+
+export interface CaseSuspect {
+  id: string;
+  name: string;
+  role: string;
+  /** true quando a pessoa ou o papel dela foi criado ou suposto para o jogo. */
+  dramatized: boolean;
+  /** Para cada característica: confirma, contradiz ou não se sabe. */
+  traits: Record<string, 'sim' | 'nao' | '?'>;
 }
 
 export interface Option {
@@ -323,6 +373,10 @@ export interface CaseFile {
   };
   locations: Location[];
   evidence: Evidence[];
+  /** Parceiro que comenta cada etapa (falas sempre dramatizadas). */
+  partner?: { name: string; lines: Partial<Record<Step, string>> };
+  suspects?: CaseSuspect[];
+  profile?: ProfileTrait[];
   training: TrainingModule;
   lab: LabModule;
   accusation: Question[];
@@ -367,4 +421,15 @@ export interface GameState {
     answers: Record<string, string>;
     submitted: boolean;
   };
+  /** Cenas de busca por lugar. */
+  search: Record<string, SearchProgress>;
+}
+
+export interface SearchProgress {
+  found: string[];
+  misclicks: number;
+  hints: number;
+  startedAt: number | null;
+  elapsedMs: number | null;
+  bestStars: number;
 }

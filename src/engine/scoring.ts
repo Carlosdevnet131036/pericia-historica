@@ -149,6 +149,14 @@ export function computeScore(c: CaseFile, s: GameState): Score {
     max: c.accusation.length * 2,
   };
   const lines = [training, labScore(c, s), accusation];
+  const searchable = c.locations.filter((l) => l.search);
+  if (searchable.length) {
+    lines.unshift({
+      label: 'Estrelas nas cenas de busca',
+      points: searchable.reduce((sum, l) => sum + (s.search[l.id]?.bestStars ?? 0), 0),
+      max: searchable.length * 5,
+    });
+  }
   const total = lines.reduce((a, l) => a + l.points, 0);
   const max = lines.reduce((a, l) => a + l.max, 0);
   const ratio = max === 0 ? 0 : total / max;

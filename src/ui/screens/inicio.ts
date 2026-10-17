@@ -17,6 +17,14 @@ function status(c: CaseFile): string {
   return `Em andamento · ${step?.label ?? ''}`;
 }
 
+/** Estrelas somadas das cenas de busca do caso, se houver. */
+function starLine(c: CaseFile): string | null {
+  const scenes = c.locations.filter((l) => l.search);
+  if (!scenes.length) return null;
+  const got = scenes.reduce((sum, l) => sum + (loadSaved(c.id)?.search[l.id]?.bestStars ?? 0), 0);
+  return `★ ${got} de ${scenes.length * 5}`;
+}
+
 export function inicio(): HTMLElement {
   const fresh = firstTime('inicio');
   return h(
@@ -49,6 +57,7 @@ export function inicio(): HTMLElement {
             h('span', { class: 'case-meta' }, `${c.place} · ${c.year}`),
             h('span', { class: 'case-tech' }, c.technique),
             h('span', { class: 'case-status' }, status(c)),
+            starLine(c) ? h('span', { class: 'case-stars' }, starLine(c)) : null,
           ),
         ),
       ),

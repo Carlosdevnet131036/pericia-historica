@@ -14,6 +14,7 @@ export function initialState(caseId: string): GameState {
     training: { answers: {}, firstTry: {} },
     lab: { marks: {}, verdicts: {}, features: [], hypothesis: null, bills: [], lead: null, align: {}, answers: {}, overlay: {}, submitted: false },
     accusation: { answers: {}, submitted: false },
+    search: {},
   };
 }
 

@@ -39,6 +39,7 @@ export const rojas1892: CaseFile = {
       name: 'O rancho de Francisca Rojas',
       blurb: 'A casa onde as crianças foram encontradas, já revistada pela polícia local.',
       scene: 'casa',
+      search: { targets: ['lamparina', 'chave', 'xicara', 'vela', 'chapeu', 'moeda', 'pente', 'botao'], clutter: 20, seed: 1892 },
       evidenceIds: ['cena', 'mancha'],
     },
     {
@@ -46,6 +47,7 @@ export const rojas1892: CaseFile = {
       name: 'A delegacia de Necochea',
       blurb: 'Onde estão os depoimentos e o detido.',
       scene: 'delegacia',
+      search: { targets: ['pena', 'carta', 'oculos', 'relogio', 'livro', 'lupa', 'cachimbo', 'cadeado'], clutter: 20, seed: 7 },
       evidenceIds: ['depoimento-rojas', 'depoimento-velazquez', 'relatorio'],
     },
     {
@@ -53,6 +55,7 @@ export const rojas1892: CaseFile = {
       name: 'A vizinhança',
       blurb: 'Ranchos espalhados pelos arredores, onde todos se conhecem.',
       scene: 'campo',
+      search: { targets: ['ferradura', 'garrafa', 'luva', 'colher', 'fosforos', 'tesoura', 'chave', 'lamparina'], clutter: 20, seed: 33 },
       evidenceIds: ['vizinhos'],
     },
   ],
@@ -117,6 +120,45 @@ export const rojas1892: CaseFile = {
         'Estas falas são dramatizadas. Relatos posteriores do caso mencionam esse possível motivo e um álibi para Velázquez, mas não encontrei esses pontos em fonte primária.',
       ],
     },
+  ],
+  partner: {
+    name: 'Inspetor Eduardo Álvarez',
+    lines: {
+      expediente: 'Dizem em La Plata que este caso não tem saída. Vamos ver o que a casa tem a dizer.',
+      investigacao: 'A polícia local já passou por aqui e não viu nada. Olhe com calma: o que importa costuma estar à vista.',
+      treino: 'Vucetich me ensinou assim: primeiro classificar, depois comparar.',
+      laboratorio: 'Se aquela mancha for mesmo uma digital, ela tem dono.',
+      acusacao: 'Confira o quadro. Só afirme o que a prova sustenta.',
+      revelacao: 'Foi a primeira vez que uma digital resolveu um crime. Não vai ser a última.',
+    },
+  },
+  suspects: [
+    {
+      id: 'rojas',
+      name: 'Francisca Rojas',
+      role: 'Mãe das crianças; acusa o vizinho',
+      dramatized: false,
+      traits: { local: 'sim', tipo: 'sim', digital: 'sim' },
+    },
+    {
+      id: 'velazquez',
+      name: 'Pedro Ramón Velázquez',
+      role: 'Vizinho acusado; detido, nega tudo',
+      dramatized: false,
+      traits: { local: '?', tipo: 'sim', digital: 'nao' },
+    },
+    {
+      id: 'pretendente',
+      name: 'O pretendente',
+      role: 'Homem que cortejaria Francisca, citado em relatos posteriores; nome desconhecido',
+      dramatized: true,
+      traits: { local: '?', tipo: '?', digital: '?' },
+    },
+  ],
+  profile: [
+    { id: 'local', label: 'Estava no rancho naquela noite', revealedAt: 'investigacao', source: 'cena e depoimentos' },
+    { id: 'tipo', label: 'Polegar com desenho de presilha externa', revealedAt: 'laboratorio', source: 'classificação das fichas (no jogo)' },
+    { id: 'digital', label: 'Deixou a digital ensanguentada no marco da porta', revealedAt: 'acusacao', source: 'confronto no laboratório' },
   ],
   training: {
     kind: 'datiloscopia',
@@ -277,7 +319,8 @@ export const rojas1892: CaseFile = {
         'Motivo e álibi: o pretendente que não queria as crianças e o álibi de Velázquez aparecem em relatos posteriores, sem fonte primária localizada.',
       ],
       dramatized: [
-        'O papel do jogador como auxiliar da Oficina de Identificação.',
+        'O papel do jogador como auxiliar da Oficina de Identificação, as falas do inspetor Álvarez e as cenas de busca de objetos.',
+        'O pretendente no quadro de suspeitos: aparece em relatos posteriores, sem nome nem fonte primária.',
         'O texto do telegrama, do relatório do comissário e das falas dos vizinhos.',
         'As impressões digitais mostradas: são geradas por computador. A ficha original de Francisca Rojas existe, mas o desenho do jogo não a reproduz.',
       ],
