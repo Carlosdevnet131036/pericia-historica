@@ -1,9 +1,13 @@
 import * as THREE from 'three';
 import type { ObjectId } from '../../engine/types';
+import { OBJECT_NAMES } from '../../ui/art/objects';
 import { box, circle, overlaps, type Collider } from '../collision';
 import type { Interactable } from '../interaction';
 import type { Vec2 } from '../motion';
 import { adobeTexture, dirtTexture, groundTexture, sizedBox, thatchTexture, woodTexture } from '../materials';
+import { buildProp, createGlint, glintTexture } from '../props';
+import type { ExploreSession, FindOutcome } from '../session';
+import { BENCH, DOOR_H, DOOR_X0, DOOR_X1, HOUSE_D, HOUSE_W, HOUSE_Z, INNER, QUARTO, RIDGE, SEARCH_SPOTS, TABLE, TRUNK, WALL_H, WALL_T, WINDOWS } from './rancho-layout';
 
 /**
  * O rancho de Francisca Rojas, Necochea, 1892: reconstrução dramatizada.
@@ -13,17 +17,23 @@ import { adobeTexture, dirtTexture, groundTexture, sizedBox, thatchTexture, wood
  * ramada na frente, curral de estacas e um ombú. Unidades em metros; a frente
  * da casa olha para +z, onde o jogador começa.
  *
- * Etapa 2: paredes, móveis, curral e árvore bloqueiam o jogador e a câmera;
- * a porta abre e fecha; a lamparina pode ser examinada. Os oito objetos da
- * busca entram na etapa 3.
+ * Etapa 3: os oito objetos da busca do rancho estão espalhados pela casa e
+ * pelo terreiro. Examinar um objeto o registra no mesmo progresso da busca
+ * 2D; com os oito, a cena é concluída e o marco da porta do quarto mostra a
+ * mancha do cartão documentado, que passa a poder ser examinada.
  */
 
-/** O que o painel de exame mostra. `nature` separa fato documentado de cena. */
+/**
+ * O que o painel de exame mostra. `nature` separa o que é fato documentado
+ * (texto dos cartões do caso) do que é peça de cena.
+ */
 export interface ExamineInfo {
-  object: ObjectId;
+  object?: ObjectId;
   title: string;
-  nature: 'dramatizado';
-  text: string;
+  nature: 'dramatizado' | 'documentado';
+  paragraphs: string[];
+  /** Resultado do registro, quando o exame é de um objeto da busca. */
+  find?: FindOutcome;
 }
 
 export interface SceneInteractable extends Interactable {
@@ -42,29 +52,53 @@ export interface SceneBuild {
   update(time: number, dt: number): void;
 }
 
-const HOUSE_Z = -6;
-const HOUSE_W = 9;
-const HOUSE_D = 5;
-const WALL_H = 2.6;
-const WALL_T = 0.4;
-const RIDGE = 1.7;
-const DOOR_X0 = 0.1;
-const DOOR_X1 = 1.1;
-const DOOR_H = 2;
 /** Raio do jogador para as colisões, o mesmo usado em index.ts. */
 export const PLAYER_RADIUS = 0.3;
 /** Intensidade da lamparina e da claridade que escapa para o terreiro (calibradas para exposição 1,5). */
 const LAMP_POWER = 2.2;
 const SPILL_POWER = 16;
 
-const LAMP: ExamineInfo = {
-  object: 'lamparina',
-  title: 'Lamparina',
-  nature: 'dramatizado',
-  text:
-    'Lamparina a querosene sobre a mesa, a iluminação comum no campo no fim do século XIX. ' +
-    'É peça de cena: o processo de 1892 não descreve os objetos da casa, e ela não é um indício do caso.',
+/** Descrições dos objetos da busca: peças de cena, sem relação com os fatos do caso. */
+const PROP_TEXT: Partial<Record<ObjectId, string>> = {
+  lamparina: 'Lamparina a querosene, a iluminação comum no campo no fim do século XIX.',
+  xicara: 'Xícara de louça, de uso diário.',
+  chapeu: 'Chapéu de feltro de aba larga, como os usados no campo.',
+  vela: 'Vela de sebo num prato de lata, apagada.',
+  chave: 'Chave de ferro, de fechadura simples.',
+  pente: 'Pente de chifre.',
+  moeda: 'Moeda de cobre.',
+  botao: 'Botão de osso, de roupa de trabalho.',
 };
+const PROP_NOTE = 'Peça de cena criada para a busca: o processo de 1892 não descreve os objetos da casa, e este não é um indício do caso.';
+
+/**
+ * Mancha escura e irregular, de sangue seco, para o batente: manchas
+ * sobrepostas com bordas suaves, sem detalhe gráfico. As "linhas finas e
+ * curvas" do cartão são descobertas no laboratório, não desenhadas aqui.
+ */
+function stainTexture(): THREE.CanvasTexture {
+  const c = document.createElement('canvas');
+  c.width = 64;
+  c.height = 128;
+  const g = c.getContext('2d')!;
+  const blobs = [
+    [32, 60, 22],
+    [26, 74, 16],
+    [38, 46, 14],
+    [30, 90, 10],
+  ] as const;
+  for (const [x, y, r] of blobs) {
+    const grad = g.createRadialGradient(x, y, 0, x, y, r);
+    grad.addColorStop(0, 'rgba(46,16,10,0.95)');
+    grad.addColorStop(0.7, 'rgba(52,20,12,0.75)');
+    grad.addColorStop(1, 'rgba(52,20,12,0)');
+    g.fillStyle = grad;
+    g.fillRect(0, 0, 64, 128);
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
 
 /** Gerador determinístico, para a vegetação ficar sempre no mesmo lugar. */
 function rng(seed: number) {
@@ -75,7 +109,7 @@ function rng(seed: number) {
   };
 }
 
-export function buildRancho(getPlayer: () => Vec2): SceneBuild {
+export function buildRancho(getPlayer: () => Vec2, session: ExploreSession): SceneBuild {
   const root = new THREE.Group();
   root.name = 'rancho';
   const r = rng(1892);
@@ -210,9 +244,7 @@ export function buildRancho(getPlayer: () => Vec2): SceneBuild {
 
   /* ---------- Interior (cenografia) ---------- */
 
-  // Mesa rústica com a lamparina, banco e um baú.
-  const tableX = -2.5;
-  const tableZ = HOUSE_Z - 0.9;
+  // Mesa rústica, banco e baú na sala.
   const table = new THREE.Group();
   const top = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.06, 0.8), wood);
   top.position.y = 0.76;
@@ -222,47 +254,76 @@ export function buildRancho(getPlayer: () => Vec2): SceneBuild {
     leg.position.set(lx, 0.365, lz);
     table.add(leg);
   }
-  table.position.set(tableX, 0, tableZ);
+  table.position.set(TABLE.x, 0, TABLE.z);
   add(table);
-  colliders.push(box(tableX, 0.4, tableZ, 1.4, 0.8, 0.8, { camera: false }));
+  colliders.push(box(TABLE.x, 0.4, TABLE.z, 1.4, 0.8, 0.8, { camera: false }));
 
   const bench = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.08, 0.32), wood);
-  bench.position.set(tableX, 0.44, tableZ + 0.8);
+  bench.position.set(BENCH.x, 0.44, BENCH.z);
   add(bench);
   for (const lx of [-0.5, 0.5]) {
     const leg = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.42, 0.28), wood);
-    leg.position.set(tableX + lx, 0.21, tableZ + 0.8);
+    leg.position.set(BENCH.x + lx, 0.21, BENCH.z);
     add(leg);
   }
-  colliders.push(box(tableX, 0.24, tableZ + 0.8, 1.2, 0.48, 0.32, { camera: false }));
+  colliders.push(box(BENCH.x, 0.24, BENCH.z, 1.2, 0.48, 0.32, { camera: false }));
 
-  solidBox(wood, 3.1, 0.3, back + WALL_T + 0.35, 1, 0.6, 0.55, { camera: false }, 1);
+  solidBox(wood, TRUNK.x, TRUNK.top / 2, TRUNK.z, 1, TRUNK.top, 0.55, { camera: false }, 1);
 
-  // A lamparina: base, reservatório, chaminé de vidro e chama.
-  const lamp = new THREE.Group();
-  const brass = new THREE.MeshStandardMaterial({ color: 0x8a6a3a, metalness: 0.6, roughness: 0.45 });
-  const lampBase = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 0.03, 12), brass);
-  lampBase.position.y = 0.015;
-  const font = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 0.1, 12), brass);
-  font.position.y = 0.08;
-  const flameMat = new THREE.MeshStandardMaterial({ color: 0x331a00, emissive: 0xffb45a, emissiveIntensity: 3 });
-  const flame = new THREE.Mesh(new THREE.ConeGeometry(0.018, 0.06, 8), flameMat);
-  flame.position.y = 0.17;
-  const glass = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.035, 0.05, 0.16, 12, 1, true),
-    new THREE.MeshStandardMaterial({ color: 0xf2e6cc, transparent: true, opacity: 0.3, emissive: 0xffb060, emissiveIntensity: 0.5, side: THREE.DoubleSide, depthWrite: false }),
-  );
-  glass.position.y = 0.2;
-  lamp.add(lampBase, font, flame, glass);
-  const lampX = tableX + 0.35;
-  const lampZ = tableZ - 0.05;
-  lamp.position.set(lampX, 0.79, lampZ);
-  add(lamp, false);
+  // Peitoril interno da janela da sala (onde fica o pente).
+  const innerSill = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.06, 0.18), wood);
+  innerSill.position.set(WINDOWS[0], 1.22, INNER.z1 - 0.08);
+  add(innerSill);
 
-  // A luz da lamparina ilumina o cômodo; uma segunda luz, fora, representa a
+  /* ---------- O quarto: parede interna e o marco da porta ---------- */
+
+  // A parede vai do fundo à frente, com o vão da porta do quarto entre z0 e z1.
+  solidBox(adobe, QUARTO.x, WALL_H / 2, (INNER.z0 + QUARTO.z0) / 2, QUARTO.t, WALL_H, QUARTO.z0 - INNER.z0);
+  solidBox(adobe, QUARTO.x, WALL_H / 2, (QUARTO.z1 + INNER.z1) / 2, QUARTO.t, WALL_H, INNER.z1 - QUARTO.z1);
+  solidBox(adobe, QUARTO.x, (DOOR_H + WALL_H) / 2, (QUARTO.z0 + QUARTO.z1) / 2, QUARTO.t, WALL_H - DOOR_H, QUARTO.z1 - QUARTO.z0, { solid: false });
+  // Marco de madeira clara e gasta: dois batentes e a travessa. Na madeira
+  // escura do resto da casa, a mancha escura não apareceria.
+  const paleWood = new THREE.MeshStandardMaterial({ color: 0xa48c6c, roughness: 0.95 });
+  const jambDepth = QUARTO.t + 0.06;
+  const jambZ = [QUARTO.z0 + QUARTO.jamb / 2, QUARTO.z1 - QUARTO.jamb / 2] as const;
+  for (const z of jambZ) solidBox(paleWood, QUARTO.x, DOOR_H / 2, z, jambDepth, DOOR_H, QUARTO.jamb, { camera: false }, 1);
+  const lintel = new THREE.Mesh(new THREE.BoxGeometry(jambDepth, 0.08, QUARTO.z1 - QUARTO.z0), paleWood);
+  lintel.position.set(QUARTO.x, DOOR_H + 0.04, (QUARTO.z0 + QUARTO.z1) / 2);
+  add(lintel);
+
+  // A mancha do cartão documentado, na face do batente voltada para a sala.
+  // Só aparece com a busca concluída, a mesma regra que libera o cartão.
+  const stainTex = stainTexture();
+  const stain = new THREE.Mesh(new THREE.PlaneGeometry(0.078, 0.22), new THREE.MeshStandardMaterial({ map: stainTex, transparent: true, roughness: 0.9, depthWrite: false }));
+  stain.rotation.y = -Math.PI / 2;
+  const stainZ = jambZ[1];
+  stain.position.set(QUARTO.x - jambDepth / 2 - 0.003, 1.15, stainZ);
+  root.add(stain);
+
+  /* ---------- Objetos da busca ---------- */
+
+  const glintTex = glintTexture();
+  const props: { id: ObjectId; glint: THREE.Sprite; baseY: number; phase: number }[] = [];
+  let lampFlame: THREE.MeshStandardMaterial | undefined;
+  for (const id of session.targets) {
+    const spot = SEARCH_SPOTS[id];
+    if (!spot) throw new Error(`o objeto ${id} não tem lugar no rancho 3D`);
+    const built = buildProp(id);
+    built.group.position.set(spot.x, spot.y, spot.z);
+    built.group.rotation.y = spot.rot;
+    add(built.group, id === 'chapeu');
+    if (id === 'lamparina') lampFlame = built.flame;
+    const glint = createGlint(glintTex);
+    glint.position.set(spot.x, spot.y + 0.14, spot.z);
+    root.add(glint);
+    props.push({ id, glint, baseY: spot.y + 0.14, phase: props.length * 1.7 });
+  }
+
+  // A luz da lamparina ilumina a sala; uma segunda luz, fora, representa a
   // claridade que escapa pela porta e pelas janelas.
+  const lampSpot = SEARCH_SPOTS.lamparina ?? { x: TABLE.x, y: TABLE.top, z: TABLE.z };
   const lampLight = new THREE.PointLight(0xffa04a, LAMP_POWER, 7, 1.6);
-  lampLight.position.set(lampX, 1.1, lampZ);
+  lampLight.position.set(lampSpot.x, 1.1, lampSpot.z);
   root.add(lampLight);
 
   /* ---------- Ramada: alpendre de troncos e galhos em frente à porta ---------- */
@@ -398,12 +459,34 @@ export function buildRancho(getPlayer: () => Vec2): SceneBuild {
         doorIsOpen = !doorIsOpen;
       },
     },
+    ...props.map(({ id }): SceneInteractable => {
+      const spot = SEARCH_SPOTS[id]!;
+      const name = OBJECT_NAMES[id];
+      return {
+        id,
+        at: { x: spot.x, z: spot.z },
+        reach: 1.5,
+        label: () => `Examinar: ${name}${session.isFound(id) ? ' (registrado)' : ''}`,
+        use: () => ({
+          object: id,
+          title: name,
+          nature: 'dramatizado',
+          paragraphs: [`${PROP_TEXT[id] ?? name} Está ${spot.where}.`, PROP_NOTE],
+          find: session.find(id),
+        }),
+      };
+    }),
     {
-      id: 'lamparina',
-      at: { x: lampX, z: lampZ },
-      reach: 1.5,
-      label: () => 'Examinar a lamparina',
-      use: () => LAMP,
+      id: 'mancha',
+      at: { x: QUARTO.x - 0.3, z: stainZ },
+      reach: 1.4,
+      label: () => 'Examinar o marco da porta do quarto',
+      enabled: () => session.isComplete(),
+      use: () => {
+        const card = session.evidence('mancha');
+        if (!card) return;
+        return { title: card.title, nature: card.dramatized ? 'dramatizado' : 'documentado', paragraphs: card.paragraphs };
+      },
     },
   ];
 
@@ -419,8 +502,19 @@ export function buildRancho(getPlayer: () => Vec2): SceneBuild {
       warm.intensity = SPILL_POWER * flicker;
       lampLight.intensity = LAMP_POWER * flicker;
       glow.emissiveIntensity = 1.6 * flicker;
-      flameMat.emissiveIntensity = 3 * flicker;
-      flame.scale.y = 0.9 + (flicker - 0.88) * 2;
+      if (lampFlame) lampFlame.emissiveIntensity = 3 * flicker;
+
+      // Brilho pulsante nos objetos ainda não registrados.
+      for (const p of props) {
+        const found = session.isFound(p.id);
+        p.glint.visible = !found;
+        if (found) continue;
+        const pulse = 0.5 + 0.5 * Math.sin(time * 2.4 + p.phase);
+        p.glint.material.opacity = 0.35 + pulse * 0.5;
+        p.glint.scale.setScalar(0.14 + pulse * 0.08);
+        p.glint.position.y = p.baseY + pulse * 0.02;
+      }
+      stain.visible = session.isComplete();
 
       // A porta gira suavemente até o ângulo alvo (amortecimento exponencial).
       const targetAngle = doorIsOpen ? OPEN_ANGLE : 0;

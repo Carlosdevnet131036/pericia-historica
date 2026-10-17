@@ -6,7 +6,7 @@ import type { MoveInput } from './motion';
  * O mouse usa pointer lock; se o navegador recusar, cai para "arrastar para
  * olhar".
  */
-export type Action = 'forward' | 'back' | 'left' | 'right' | 'run' | 'pause' | 'interact';
+export type Action = 'forward' | 'back' | 'left' | 'right' | 'run' | 'pause' | 'interact' | 'journal';
 
 export const DEFAULT_KEYS: Record<string, Action> = {
   KeyW: 'forward',
@@ -21,12 +21,14 @@ export const DEFAULT_KEYS: Record<string, Action> = {
   ShiftRight: 'run',
   Escape: 'pause',
   KeyE: 'interact',
+  KeyJ: 'journal',
 };
 
 /** Ações de um toque só (não ficam "seguradas" como as de movimento). */
 export interface InputHandlers {
   pause?(): void;
   interact?(): void;
+  journal?(): void;
 }
 
 export class Input {
@@ -88,7 +90,7 @@ export class Input {
   private key(e: KeyboardEvent, down: boolean): void {
     const action = this.keys[e.code];
     if (!action) return;
-    if (action === 'pause' || action === 'interact') {
+    if (action === 'pause' || action === 'interact' || action === 'journal') {
       // Segurar a tecla gera repetições; a ação dispara uma vez por toque.
       if (down && !e.repeat) this.handlers[action]?.();
       return;

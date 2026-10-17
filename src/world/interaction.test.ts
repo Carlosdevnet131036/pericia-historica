@@ -32,6 +32,14 @@ describe('escolha do objeto para a tecla E', () => {
     expect(pickInteractable({ x: 0, z: 0 }, 0, items)?.id).toBe('lamparina');
   });
 
+  it('um objeto na mira vence outro mais perto, mas de lado (lamparina vs. chapéu no banco)', () => {
+    // Medidas do rancho: o jogador diante do banco, olhando para a lamparina na mesa.
+    const items = [item('chapeu', -2.3, -6.1), item('lamparina', -2.15, -6.95)];
+    expect(pickInteractable({ x: -2.15, z: -5.55 }, 0, items)?.id).toBe('lamparina');
+    // Olhando para o chapéu, ele é que é escolhido.
+    expect(pickInteractable({ x: -2.3, z: -5.5 }, 0, items)?.id).toBe('chapeu');
+  });
+
   it('objetos desabilitados são ignorados', () => {
     const items = [item('porta', 0, -1, { enabled: () => false })];
     expect(pickInteractable({ x: 0, z: 0 }, 0, items)).toBeNull();

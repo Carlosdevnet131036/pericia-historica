@@ -434,4 +434,10 @@ export interface SearchProgress {
   startedAt: number | null;
   elapsedMs: number | null;
   bestStars: number;
+  /**
+   * Onde a cena foi concluída. A busca 2D e a exploração 3D compartilham este
+   * progresso, mas pontuam o tempo de formas diferentes (ver engine/search.ts).
+   * Ausente em saves antigos, que só tinham a versão 2D.
+   */
+  completedIn?: '2d' | '3d';
 }

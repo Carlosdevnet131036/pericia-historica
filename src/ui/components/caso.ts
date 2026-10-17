@@ -1,4 +1,5 @@
-import { STEPS, type CaseFile, type GameState, type Step } from '../../engine/types';
+import { STEPS, type CaseFile, type Evidence, type GameState, type Step } from '../../engine/types';
+import { evidenceIcon } from '../art/icons';
 import { canvas, ink, paper, shade } from '../art/svg';
 import { h } from '../dom';
 
@@ -86,3 +87,29 @@ export function suspectsBoard(c: CaseFile, st: GameState): HTMLElement | null {
   );
 }
 
+const KIND_LABEL: Record<Evidence['kind'], string> = {
+  documento: 'Documento',
+  depoimento: 'Depoimento',
+  local: 'Local',
+  objeto: 'Vestígio',
+};
+
+/** Cartão de evidência, com o tipo e a etiqueta documentado/dramatizado. */
+export function evidenceCard(e: Evidence, i: number, fresh: boolean): HTMLElement {
+  return h(
+    'article',
+    { class: `evidence${fresh ? ' rise' : ''}`, style: `--i:${i + 1}` },
+    h(
+      'div',
+      { class: 'evidence-tags' },
+      h('span', { class: 'tag tag-kind' }, evidenceIcon(e.kind), KIND_LABEL[e.kind]),
+      h(
+        'span',
+        { class: e.dramatized ? 'tag tag-dram' : 'tag tag-doc' },
+        e.dramatized ? 'Dramatizado' : 'Documentado',
+      ),
+    ),
+    h('h3', {}, e.title),
+    ...e.paragraphs.map((p) => h('p', {}, p)),
+  );
+}

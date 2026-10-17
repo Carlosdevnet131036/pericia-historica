@@ -1,38 +1,11 @@
 import type { Evidence } from '../../engine/types';
-import { evidenceIcon } from '../art/icons';
 import { scene } from '../art/scenes';
 import { drawIn } from '../art/svg';
 import { h } from '../dom';
 import { firstTime, onCaseChange } from '../view-state';
-import { suspectsBoard } from '../components/caso';
+import { evidenceCard, suspectsBoard } from '../components/caso';
 import { isSearchDone, searchPanel, searchProgress, stars } from '../modules/busca';
 import type { Screen } from './context';
-
-const KIND_LABEL: Record<Evidence['kind'], string> = {
-  documento: 'Documento',
-  depoimento: 'Depoimento',
-  local: 'Local',
-  objeto: 'Vestígio',
-};
-
-function evidenceCard(e: Evidence, i: number, fresh: boolean): HTMLElement {
-  return h(
-    'article',
-    { class: `evidence${fresh ? ' rise' : ''}`, style: `--i:${i + 1}` },
-    h(
-      'div',
-      { class: 'evidence-tags' },
-      h('span', { class: 'tag tag-kind' }, evidenceIcon(e.kind), KIND_LABEL[e.kind]),
-      h(
-        'span',
-        { class: e.dramatized ? 'tag tag-dram' : 'tag tag-doc' },
-        e.dramatized ? 'Dramatizado' : 'Documentado',
-      ),
-    ),
-    h('h3', {}, e.title),
-    ...e.paragraphs.map((p) => h('p', {}, p)),
-  );
-}
 
 let active: string | null = null;
 onCaseChange(() => {

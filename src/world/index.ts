@@ -1,12 +1,17 @@
 import * as THREE from 'three';
 import { canvas } from '../ui/art/svg';
-import { placedObject } from '../ui/art/objects';
+import { OBJECT_NAMES, placedObject } from '../ui/art/objects';
+import { evidenceCard } from '../ui/components/caso';
+import { h } from '../ui/dom';
 import { cameraDistance, resolveCircle } from './collision';
 import { Input } from './input';
 import { pickInteractable } from './interaction';
 import { clampPitch, clampToRadius, headingOf, moveDelta, orbitPosition, turnTowards } from './motion';
 import { createPlayer } from './player';
 import { buildRancho, PLAYER_RADIUS, type ExamineInfo, type SceneInteractable } from './scenes/rancho';
+import type { ExploreSession } from './session';
+
+export { createSession } from './session';
 
 /**
  * Ponto de entrada do modo 3D. Este arquivo (e o Three.js) só é baixado
@@ -16,13 +21,15 @@ export interface WorldOptions {
   caseTitle: string;
   locationName: string;
   backHref: string;
+  /** Progresso da busca deste lugar, compartilhado com a versão 2D. */
+  session: ExploreSession;
 }
 
 export interface WorldHandle {
   dispose(): void;
 }
 
-type Mode = 'intro' | 'playing' | 'paused' | 'examine';
+type Mode = 'intro' | 'playing' | 'paused' | 'examine' | 'journal';
 
 const CAMERA_DISTANCE = 4.6;
 const HEAD_HEIGHT = 1.65;
@@ -31,7 +38,15 @@ const HIDE_PLAYER_BELOW = 0.7;
 
 const NATURE_LABEL: Record<ExamineInfo['nature'], string> = {
   dramatizado: 'Reconstrução dramatizada',
+  documentado: 'Documentado',
 };
+
+const stars = (n: number) => '★'.repeat(n) + '☆'.repeat(5 - n);
+
+function formatTime(ms: number): string {
+  const sec = Math.round(ms / 1000);
+  return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
+}
 
 export function webglAvailable(): boolean {
   try {
@@ -88,7 +103,8 @@ export function mountWorld(container: HTMLElement, opts: WorldOptions): WorldHan
   const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 400);
 
   const player = createPlayer();
-  const world = buildRancho(() => ({ x: player.root.position.x, z: player.root.position.z }));
+  const { session } = opts;
+  const world = buildRancho(() => ({ x: player.root.position.x, z: player.root.position.z }), session);
   scene.add(world.root);
   player.root.position.copy(world.spawn);
   player.root.rotation.y = Math.PI; // de frente para a casa
@@ -97,16 +113,25 @@ export function mountWorld(container: HTMLElement, opts: WorldOptions): WorldHan
   /* ---------- Interface sobreposta ---------- */
 
   const hud = el('div', 'world-hud');
-  hud.append(el('p', 'world-eyebrow', `${opts.caseTitle} · protótipo 3D, etapa 2`), el('p', 'world-place', opts.locationName));
-  const help = el('p', 'world-help', 'W A S D andar · Shift correr · mouse olhar · E interagir · Esc pausar');
+  hud.append(el('p', 'world-eyebrow', `${opts.caseTitle} · protótipo 3D, etapa 3`), el('p', 'world-place', opts.locationName));
+  const help = el('p', 'world-help', 'W A S D andar · Shift correr · mouse olhar · E examinar · J diário · Esc pausar');
   const prompt = el('p', 'world-prompt');
   prompt.hidden = true;
   prompt.setAttribute('aria-live', 'polite');
+  // Contador da busca, no canto: o mesmo progresso da versão 2D.
+  const counter = el('p', 'world-counter');
+  counter.setAttribute('aria-live', 'polite');
+  const refreshCounter = () => {
+    counter.textContent = session.isComplete()
+      ? 'Busca concluída · J diário'
+      : `Objetos ${session.foundCount()}/${session.targets.length} · J diário`;
+  };
+  refreshCounter();
   const overlay = el('div', 'world-overlay');
   const card = el('div', 'world-card');
   card.setAttribute('role', 'dialog');
   overlay.append(card);
-  container.append(hud, help, prompt, overlay);
+  container.append(hud, counter, help, prompt, overlay);
 
   let mode: Mode = 'intro';
   let focused: SceneInteractable | null = null;
@@ -115,13 +140,19 @@ export function mountWorld(container: HTMLElement, opts: WorldOptions): WorldHan
     // Esc só pausa; para voltar, o jogador clica em "Continuar" (o navegador
     // exige um gesto para capturar o mouse de novo).
     pause: () => {
-      if (mode === 'playing' || mode === 'examine') setMode('paused');
+      if (mode === 'playing' || mode === 'examine' || mode === 'journal') setMode('paused');
+    },
+    // J abre e fecha o diário.
+    journal: () => {
+      if (mode === 'journal') void resume();
+      else if (mode === 'playing') showJournal();
     },
     // E usa o objeto em foco; no painel de exame, E também fecha o painel.
     interact: () => {
       if (mode === 'examine') void resume();
       else if (mode === 'playing' && focused) {
         const shown = focused.use();
+        refreshCounter();
         if (shown) showExamine(shown);
       }
     },
@@ -129,6 +160,9 @@ export function mountWorld(container: HTMLElement, opts: WorldOptions): WorldHan
 
   const resume = async () => {
     await input.lock();
+    // O relógio da busca começa quando o jogador começa a explorar (se a cena
+    // não foi iniciada na versão 2D nem concluída).
+    session.begin();
     setMode('playing');
     renderer.domElement.focus();
   };
@@ -154,7 +188,9 @@ export function mountWorld(container: HTMLElement, opts: WorldOptions): WorldHan
     const title = next === 'intro' ? opts.locationName : 'Pausa';
     const text =
       next === 'intro'
-        ? 'Reconstrução dramatizada de um rancho do pampa em 1892. A casa já pode ser visitada: abra a porta e examine o que estiver ao alcance. Os objetos da busca chegam na próxima etapa.'
+        ? session.isComplete()
+          ? 'Reconstrução dramatizada de um rancho do pampa em 1892. A busca deste lugar já foi concluída; os cartões liberados estão no diário (J).'
+          : `Reconstrução dramatizada de um rancho do pampa em 1892. Encontre e examine os ${session.targets.length} objetos da busca (E) para liberar os cartões deste lugar. O relógio começa quando você entra. O que achar aqui vale também na versão 2D.`
         : 'O jogo está pausado.';
     card.className = 'world-card';
     card.replaceChildren(el('h2', '', title), el('p', '', text), actions(next === 'intro' ? 'Explorar' : 'Continuar'));
@@ -162,22 +198,80 @@ export function mountWorld(container: HTMLElement, opts: WorldOptions): WorldHan
 
   /** Painel de exame: o mouse é liberado para ler e clicar; E ou o botão voltam. */
   function showExamine(info: ExamineInfo): void {
-    mode = 'examine';
+    openPanel('examine', 'world-card world-examine');
+    const parts: (HTMLElement | SVGElement)[] = [];
+    if (info.object) {
+      const art = canvas('-30 -30 60 60', info.title);
+      art.root.append(placedObject(info.object, art.hatch, 0, 0, 0, 1.15));
+      art.root.classList.add('world-examine-art');
+      parts.push(art.root);
+    }
+    parts.push(
+      el('p', `world-nature${info.nature === 'documentado' ? ' is-doc' : ''}`, NATURE_LABEL[info.nature]),
+      el('h2', '', info.title),
+      ...info.paragraphs.map((t) => el('p', '', t)),
+    );
+    const f = info.find;
+    if (f?.completed) {
+      parts.push(
+        h(
+          'div',
+          { class: 'world-result' },
+          h('p', { class: 'world-result-title' }, 'Busca concluída'),
+          h('p', { class: 'search-stars', 'aria-label': `${f.stars} de 5 estrelas` }, stars(f.stars ?? 0)),
+          h('p', {}, `Tempo ${formatTime(f.elapsedMs ?? 0)}. Liberados no diário: ${(f.released ?? []).map((e) => e.title).join('; ')}.`),
+        ),
+      );
+    } else if (f?.isNew) {
+      parts.push(el('p', 'world-status', `Registrado no diário · ${session.foundCount()} de ${session.targets.length}`));
+    } else if (f) {
+      parts.push(el('p', 'world-status', 'Já registrado no diário.'));
+    }
+    parts.push(actions('Voltar à exploração (E)'));
+    card.replaceChildren(...parts);
+  }
+
+  /**
+   * Diário: objetos da busca deste lugar e todas as evidências liberadas no
+   * caso, com as mesmas etiquetas da versão 2D (tipo e documentado ou
+   * dramatizado).
+   */
+  function showJournal(): void {
+    openPanel('journal', 'world-card world-journal');
+    const evidence = session.unlocked();
+    card.replaceChildren(
+      el('h2', '', 'Diário de investigação'),
+      h(
+        'section',
+        {},
+        h('h3', {}, `${session.location.name}: objetos da busca (${session.foundCount()} de ${session.targets.length})`),
+        h(
+          'ul',
+          { class: 'search-list world-journal-list' },
+          ...session.targets.map((id) => h('li', { class: session.isFound(id) ? 'is-found' : '' }, OBJECT_NAMES[id])),
+        ),
+        h('p', { class: 'caption' }, 'Peças de cena: encontrá-las libera os cartões do lugar, mas elas não são indícios do caso.'),
+      ),
+      h(
+        'section',
+        {},
+        h('h3', {}, `Evidências liberadas no caso (${evidence.length})`),
+        evidence.length
+          ? h('div', { class: 'evidence-list' }, ...evidence.map((e, i) => evidenceCard(e, i, false)))
+          : h('p', { class: 'caption' }, 'Nenhuma ainda. Conclua a busca deste lugar, ou investigue os outros na versão 2D.'),
+      ),
+      actions('Fechar o diário (J)'),
+    );
+  }
+
+  /** Abre um painel que solta o mouse (exame, diário). */
+  function openPanel(next: 'examine' | 'journal', cls: string): void {
+    mode = next;
     input.unlock();
     overlay.hidden = false;
     help.hidden = true;
     prompt.hidden = true;
-    const art = canvas('-30 -30 60 60', info.title);
-    art.root.append(placedObject(info.object, art.hatch, 0, 0, 0, 1.15));
-    art.root.classList.add('world-examine-art');
-    card.className = 'world-card world-examine';
-    card.replaceChildren(
-      art.root,
-      el('p', 'world-nature', NATURE_LABEL[info.nature]),
-      el('h2', '', info.title),
-      el('p', '', info.text),
-      actions('Voltar à exploração (E)'),
-    );
+    card.className = cls;
   }
 
   setMode('intro');
@@ -277,6 +371,9 @@ export function mountWorld(container: HTMLElement, opts: WorldOptions): WorldHan
       },
       get focused() {
         return focused?.id ?? null;
+      },
+      get found() {
+        return session.foundCount();
       },
       place(x: number, z: number, viewYaw = yaw, viewPitch = pitch) {
         player.root.position.set(x, 0, z);

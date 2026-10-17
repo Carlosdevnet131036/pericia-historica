@@ -1976,6 +1976,9 @@ a.case-card:hover {
 
 .world-card {
   max-width: 460px;
+  /* Em telas baixas o painel rola por dentro em vez de cortar o topo. */
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
   background: var(--sheet);
   border: 1px solid var(--rule);
   box-shadow: 0 20px 60px -20px rgb(0 0 0 / 0.9);
@@ -2048,4 +2051,55 @@ a.case-card:hover {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--stamp);
+}
+
+.world-counter {
+  position: absolute;
+  top: calc(14px + env(safe-area-inset-top, 0px));
+  right: max(16px, env(safe-area-inset-right, 0px));
+  font-family: var(--font-type);
+  font-size: 0.85rem;
+  pointer-events: none;
+  text-shadow: 0 1px 3px rgb(0 0 0 / 0.8);
+}
+
+.world-nature.is-doc {
+  color: #9fd3a8;
+}
+
+.world-status {
+  font-family: var(--font-type);
+  font-size: 0.85rem;
+  color: var(--stamp);
+}
+
+.world-result {
+  border: 1px solid var(--rule);
+  padding: 10px 14px;
+  display: grid;
+  gap: 4px;
+}
+
+.world-result-title {
+  font-family: var(--font-type);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--blood);
+}
+
+/* O diário é mais largo e rola por dentro, se as evidências não couberem. */
+.world-journal {
+  max-width: min(760px, 100%);
+}
+
+.world-journal h3 {
+  font-size: 1rem;
+  margin-bottom: 8px;
+}
+
+.world-journal-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
 }

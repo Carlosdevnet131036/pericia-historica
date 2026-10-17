@@ -1,4 +1,4 @@
-import { HIT_RADIUS, SEARCH_H, SEARCH_W, hitTarget, layoutSearch, searchScore, searchStars } from '../../engine/search';
+import { EMPTY_SEARCH, HIT_RADIUS, SEARCH_H, SEARCH_W, hitTarget, layoutSearch, progressScore, searchScore, searchStars } from '../../engine/search';
 import type { Location, SearchProgress } from '../../engine/types';
 import { ALL_OBJECTS, OBJECT_NAMES, placedObject } from '../art/objects';
 import { scene } from '../art/scenes';
@@ -7,7 +7,7 @@ import { h } from '../dom';
 import { onCaseChange } from '../view-state';
 import type { ScreenContext } from '../screens/context';
 
-const EMPTY: SearchProgress = { found: [], misclicks: 0, hints: 0, startedAt: null, elapsedMs: null, bestStars: 0 };
+const EMPTY: SearchProgress = EMPTY_SEARCH;
 
 /* Estado só de tela: último erro (para o X vermelho) e alvo da dica. */
 let lastMiss: { x: number; y: number; at: number } | null = null;
@@ -96,7 +96,7 @@ export function searchPanel(ctx: ScreenContext, loc: Location): HTMLElement {
       }
       const elapsedMs = Date.now() - (p.startedAt ?? Date.now());
       const score = searchScore(elapsedMs / 1000, p.misclicks, p.hints);
-      save({ found, elapsedMs, bestStars: Math.max(p.bestStars, searchStars(score)) });
+      save({ found, elapsedMs, completedIn: '2d', bestStars: Math.max(p.bestStars, searchStars(score)) });
       // Completar a cena conta como visitar o lugar.
       store.update((st) => (st.visited.includes(loc.id) ? st : { ...st, visited: [...st.visited, loc.id] }));
     });
@@ -143,12 +143,18 @@ export function searchPanel(ctx: ScreenContext, loc: Location): HTMLElement {
 
   const summary = done
     ? (() => {
-        const score = searchScore((p.elapsedMs ?? 0) / 1000, p.misclicks, p.hints);
+        const score = progressScore(p);
         return h(
           'div',
           { class: 'search-summary' },
           h('p', { class: 'search-stars', 'aria-label': `${searchStars(score)} de 5 estrelas` }, stars(searchStars(score))),
-          h('p', {}, `Tempo ${formatTime(p.elapsedMs ?? 0)} · ${p.misclicks} erros · ${p.hints} dicas · ${score} pontos`),
+          h(
+            'p',
+            {},
+            p.completedIn === '3d'
+              ? `Concluída na exploração 3D · tempo ${formatTime(p.elapsedMs ?? 0)} · ${score} pontos`
+              : `Tempo ${formatTime(p.elapsedMs ?? 0)} · ${p.misclicks} erros · ${p.hints} dicas · ${score} pontos`,
+          ),
           p.bestStars > searchStars(score) ? h('p', { class: 'caption' }, `Seu recorde nesta cena: ${stars(p.bestStars)}`) : null,
           h(
             'button',
@@ -156,7 +162,7 @@ export function searchPanel(ctx: ScreenContext, loc: Location): HTMLElement {
               class: 'btn ghost',
               onclick: () => {
                 hintTarget = null;
-                save({ found: [], misclicks: 0, hints: 0, startedAt: null, elapsedMs: null });
+                save({ found: [], misclicks: 0, hints: 0, startedAt: null, elapsedMs: null, completedIn: undefined });
               },
             },
             'Jogar a cena de novo',

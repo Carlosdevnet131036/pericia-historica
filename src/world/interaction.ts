@@ -4,9 +4,9 @@ import type { Vec2 } from './motion';
  * Escolha do que o jogador pode usar com a tecla E, sem Three.js.
  *
  * Um objeto só é oferecido se estiver perto e mais ou menos na direção para
- * onde a câmera aponta. Entre vários, vence o de menor custo: distância somada
- * a uma penalidade pelo ângulo, para "o que estou olhando" ganhar de "o que
- * está mais perto, mas de lado".
+ * onde a câmera aponta. Entre vários, vence o de menor custo, em que o
+ * ângulo pesa mais que a distância, para "o que estou olhando" ganhar de "o
+ * que está mais perto, mas de lado".
  */
 export interface Interactable {
   id: string;
@@ -49,7 +49,9 @@ export function pickInteractable<T extends Interactable>(player: Vec2, yaw: numb
     // Colado no objeto, o ângulo deixa de fazer sentido.
     const angle = dist < 0.35 ? 0 : angleBetween(fx, fz, dx, dz);
     if (angle > LOOK_CONE) continue;
-    const cost = dist + angle * 0.8;
+    // O ângulo pesa mais que a distância: com objetos próximos entre si (a
+    // mesa e o banco), o que está na mira deve vencer o que está ao lado.
+    const cost = dist * 0.5 + angle * 2;
     if (cost < bestCost) {
       bestCost = cost;
       best = it;

@@ -6,7 +6,7 @@
  * cada alvo aparece uma vez, nada se sobrepõe e a bagunça nunca repete um
  * tipo de alvo (senão o clique seria ambíguo).
  */
-import type { ObjectId } from './types';
+import type { CaseFile, Evidence, GameState, ObjectId, SearchProgress } from './types';
 
 export const SEARCH_W = 800;
 export const SEARCH_H = 450;
@@ -92,4 +92,65 @@ export function searchStars(score: number): number {
   if (score >= 500) return 3;
   if (score >= 300) return 2;
   return 1;
+}
+
+/* ---------- Exploração 3D ---------- */
+
+/**
+ * Pontuação de uma cena concluída na exploração 3D. Andar pela casa leva
+ * mais tempo que clicar numa imagem, e lá não há cliques errados nem dicas,
+ * então o tempo pesa menos: 5 estrelas até 100 s, 4 até 175 s, 3 até 250 s.
+ * Valores provisórios, a calibrar com partidas reais.
+ */
+export function exploreScore(elapsedSec: number): number {
+  return Math.max(0, Math.round(1000 - elapsedSec * 2));
+}
+
+/** Pontuação de uma cena concluída, pela fórmula do modo em que terminou. */
+export function progressScore(p: SearchProgress): number {
+  const sec = (p.elapsedMs ?? 0) / 1000;
+  return p.completedIn === '3d' ? exploreScore(sec) : searchScore(sec, p.misclicks, p.hints);
+}
+
+export const EMPTY_SEARCH: SearchProgress = { found: [], misclicks: 0, hints: 0, startedAt: null, elapsedMs: null, bestStars: 0 };
+
+/** Liga o relógio da cena, se ainda não estiver ligado nem concluída. */
+export function beginSearch(p: SearchProgress, now: number): SearchProgress {
+  if (p.startedAt !== null || p.elapsedMs !== null) return p;
+  return { ...p, startedAt: now };
+}
+
+export interface FindResult {
+  progress: SearchProgress;
+  /** O objeto ainda não tinha sido registrado. */
+  isNew: boolean;
+  /** Este registro concluiu a cena. */
+  completed: boolean;
+}
+
+/**
+ * Registra um objeto encontrado na exploração 3D. Objeto fora da lista ou já
+ * registrado (inclusive na busca 2D) não muda nada: não há duplicação.
+ */
+export function registerFind(p: SearchProgress, targets: readonly ObjectId[], id: ObjectId, now: number): FindResult {
+  if (!targets.includes(id) || p.found.includes(id)) return { progress: p, isNew: false, completed: false };
+  const started = beginSearch(p, now);
+  const found = [...started.found, id];
+  if (found.length < targets.length) return { progress: { ...started, found }, isNew: true, completed: false };
+  const elapsedMs = now - (started.startedAt ?? now);
+  const done: SearchProgress = { ...started, found, elapsedMs, completedIn: '3d' };
+  return { progress: { ...done, bestStars: Math.max(p.bestStars, searchStars(progressScore(done))) }, isNew: true, completed: true };
+}
+
+/**
+ * Evidências já liberadas no caso, na ordem dos lugares: as de lugares com
+ * busca aparecem quando a cena é concluída; as demais, quando o lugar é
+ * visitado. É a mesma regra da tela de investigação.
+ */
+export function unlockedEvidence(c: CaseFile, s: GameState): Evidence[] {
+  return c.locations
+    .filter((l) => (l.search ? (s.search[l.id]?.elapsedMs ?? null) !== null : s.visited.includes(l.id)))
+    .flatMap((l) => l.evidenceIds)
+    .map((id) => c.evidence.find((e) => e.id === id))
+    .filter((e): e is Evidence => e !== undefined);
 }

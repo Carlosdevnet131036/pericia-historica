@@ -158,7 +158,10 @@ async function open3d(caseFile: CaseFile): Promise<void> {
     if (location.hash !== `#${caseFile.id}/3d`) return; // o jogador saiu durante o carregamento
     if (!mod.webglAvailable()) throw new Error('webgl');
     document.title = `${place?.name ?? caseFile.title} (3D) · Perícia Histórica`;
-    world = mod.mountWorld(root!, { caseTitle: `Caso ${caseFile.number} · ${caseFile.title}`, locationName: place?.name ?? '', backHref: back });
+    if (!place) throw new Error('sem lugar 3D');
+    // O 3D grava no mesmo save do caso: o que for achado lá aparece na versão 2D.
+    const session = mod.createSession(new Store(caseFile.id), caseFile, place);
+    world = mod.mountWorld(root!, { caseTitle: `Caso ${caseFile.number} · ${caseFile.title}`, locationName: place.name, backHref: back, session });
   } catch (err) {
     const noWebgl = err instanceof Error && err.message === 'webgl';
     root!.replaceChildren(

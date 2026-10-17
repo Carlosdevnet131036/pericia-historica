@@ -49,11 +49,14 @@ O rancho do Caso 1 pode ser explorado em 3D, em terceira pessoa: botão "Explora
 | Shift | Correr |
 | Mouse | Olhar (clique para capturar o cursor; se o navegador recusar, arraste) |
 | E | Interagir (abrir ou fechar a porta, examinar) |
+| J | Diário: objetos da busca e evidências liberadas |
 | Esc | Pausar |
 
 Arquitetura: `src/world/` é a única parte que importa o Three.js e é carregada por `import()` dinâmico, então o jogo 2D não baixa o 3D. A matemática de movimento e câmera (`world/motion.ts`), as colisões (`world/collision.ts`: jogador como círculo contra caixas e cilindros; câmera como segmento que se encurta antes de uma parede) e a escolha do objeto para a tecla E (`world/interaction.ts`) não dependem do Three.js e são testadas com Vitest. Modelos, texturas e cenário são gerados em código (sem arquivos externos nem licenças a conferir). O rancho é uma reconstrução dramatizada da arquitetura rural do pampa em 1892.
 
-Etapas: 1. personagem, câmera e cenário navegável (feito) · 2. colisões, câmera que não atravessa paredes, porta e lamparina examinável (feito; a lamparina é peça de cena, não indício) · 3. os 8 objetos da busca e os 2 cartões do rancho no 3D, com diário · 4. demais lugares e sistemas narrativos.
+Busca em 3D: os 8 objetos da busca do rancho estão na casa e no terreiro (posições dramatizadas; o quarto fica vazio). Examinar um objeto o registra no **mesmo progresso** da busca 2D (`state.search.rancho`), então o que se acha num modo vale no outro, sem duplicação. Com os 8, a cena é concluída, os cartões `cena` e `mancha` são liberados e a mancha aparece no marco da porta do quarto, examinável com o texto do cartão documentado. A pontuação da cena concluída em 3D usa outra fórmula (`exploreScore`: andar leva mais tempo que clicar; valores provisórios).
+
+Etapas: 1. personagem, câmera e cenário navegável (feito) · 2. colisões, câmera que não atravessa paredes, porta e lamparina examinável (feito) · 3. os 8 objetos da busca, o quarto com a mancha e o diário (feito) · 4. demais lugares e sistemas narrativos.
 
 ## Integração contínua
 
