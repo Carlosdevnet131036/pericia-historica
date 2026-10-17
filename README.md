@@ -1,5 +1,7 @@
 # Perícia Histórica
 
+[![CI](https://github.com/Carlosdevnet131036/pericia-historica/actions/workflows/ci.yml/badge.svg)](https://github.com/Carlosdevnet131036/pericia-historica/actions/workflows/ci.yml)
+
 Jogo de investigação no navegador baseado em **casos criminais reais resolvidos pela perícia**. Cada caso apresenta uma técnica forense que nasceu ou se firmou naquele caso. O jogador aprende a técnica, investiga, faz o confronto no laboratório e só depois vê o que realmente aconteceu, com as fontes.
 
 ## Casos
@@ -29,6 +31,17 @@ npm run dev        # http://localhost:5173
 npm test           # testes unitários (Vitest)
 npm run build      # typecheck + build de produção em dist/
 ```
+
+## Integração contínua
+
+A cada push na `main` e em todo pull request, o GitHub Actions (`.github/workflows/ci.yml`) roda:
+
+| Job | O que verifica | Falha quando |
+|-----|----------------|--------------|
+| `verificar` (Node 22 e 24) | `npm ci`, typecheck, testes e build | Erro de tipo, teste quebrado ou build com erro |
+| `auditoria` | `npm audit --audit-level=high` | Vulnerabilidade alta ou crítica nas dependências |
+
+O build do Node 22 fica disponível por 7 dias como artefato `dist` na página da execução. O Dependabot (`.github/dependabot.yml`) abre PRs semanais com atualizações, e cada PR passa pelo mesmo pipeline antes do merge.
 
 ## Arquitetura
 
