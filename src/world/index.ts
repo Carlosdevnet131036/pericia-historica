@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { canvas } from '../ui/art/svg';
-import { OBJECT_NAMES, placedObject } from '../ui/art/objects';
-import { evidenceCard } from '../ui/components/caso';
+import { placedObject } from '../ui/art/objects';
+import { notebook } from '../ui/components/diario';
 import { h } from '../ui/dom';
 import { cameraDistance, resolveCircle } from './collision';
 import { Input } from './input';
@@ -231,37 +231,11 @@ export function mountWorld(container: HTMLElement, opts: WorldOptions): WorldHan
     card.replaceChildren(...parts);
   }
 
-  /**
-   * Diário: objetos da busca deste lugar e todas as evidências liberadas no
-   * caso, com as mesmas etiquetas da versão 2D (tipo e documentado ou
-   * dramatizado).
-   */
+  /** Diário em caderno, o mesmo componente da versão 2D. */
   function showJournal(): void {
-    openPanel('journal', 'world-card world-journal');
-    const evidence = session.unlocked();
-    card.replaceChildren(
-      el('h2', '', 'Diário de investigação'),
-      h(
-        'section',
-        {},
-        h('h3', {}, `${session.location.name}: objetos da busca (${session.foundCount()} de ${session.targets.length})`),
-        h(
-          'ul',
-          { class: 'search-list world-journal-list' },
-          ...session.targets.map((id) => h('li', { class: session.isFound(id) ? 'is-found' : '' }, OBJECT_NAMES[id])),
-        ),
-        h('p', { class: 'caption' }, 'Peças de cena: encontrá-las libera os cartões do lugar, mas elas não são indícios do caso.'),
-      ),
-      h(
-        'section',
-        {},
-        h('h3', {}, `Evidências liberadas no caso (${evidence.length})`),
-        evidence.length
-          ? h('div', { class: 'evidence-list' }, ...evidence.map((e, i) => evidenceCard(e, i, false)))
-          : h('p', { class: 'caption' }, 'Nenhuma ainda. Conclua a busca deste lugar, ou investigue os outros na versão 2D.'),
-      ),
-      actions('Fechar o diário (J)'),
-    );
+    openPanel('journal', 'world-card world-notebook-host');
+    card.replaceChildren(notebook(session.caseFile, session.state(), { initial: 'objetos', onClose: () => void resume(), closeLabel: 'Fechar o diário (J)' }));
+    card.querySelector<HTMLElement>('.nb-tab.is-active')?.focus();
   }
 
   /** Abre um painel que solta o mouse (exame, diário). */

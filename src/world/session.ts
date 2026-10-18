@@ -1,6 +1,6 @@
 import { beginSearch, EMPTY_SEARCH, progressScore, registerFind, searchStars, unlockedEvidence } from '../engine/search';
 import type { Store } from '../engine/state';
-import type { CaseFile, Evidence, Location, ObjectId, SearchProgress } from '../engine/types';
+import type { CaseFile, Evidence, GameState, Location, ObjectId, SearchProgress } from '../engine/types';
 
 /**
  * Ponte entre o mundo 3D e o estado do jogo. O 3D não lê nem grava o Store
@@ -9,7 +9,10 @@ import type { CaseFile, Evidence, Location, ObjectId, SearchProgress } from '../
  * achado num modo aparece como achado no outro.
  */
 export interface ExploreSession {
+  readonly caseFile: CaseFile;
   readonly location: Location;
+  /** Estado atual do caso (só leitura), para o diário. */
+  state(): GameState;
   readonly targets: readonly ObjectId[];
   isFound(id: ObjectId): boolean;
   foundCount(): number;
@@ -42,7 +45,9 @@ export function createSession(store: Store, caseFile: CaseFile, location: Locati
   const ownEvidence = () => location.evidenceIds.map((id) => caseFile.evidence.find((e) => e.id === id)).filter((e): e is Evidence => !!e);
 
   return {
+    caseFile,
     location,
+    state: () => store.get(),
     targets: spec.targets,
     isFound: (id) => progress().found.includes(id),
     foundCount: () => progress().found.filter((id) => spec.targets.includes(id as ObjectId)).length,

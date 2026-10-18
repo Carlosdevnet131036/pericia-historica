@@ -105,10 +105,15 @@ export interface ProfileTrait {
   source: string;
 }
 
+/** Tipo de retrato em gravura no diário (genérico, nunca semelhança). */
+export type PortraitKind = 'mulher' | 'homem' | 'desconhecido';
+
 export interface CaseSuspect {
   id: string;
   name: string;
   role: string;
+  /** Retrato ilustrativo; sem ele, o diário usa a silhueta de desconhecido. */
+  portrait?: PortraitKind;
   /** true quando a pessoa ou o papel dela foi criado ou suposto para o jogo. */
   dramatized: boolean;
   /** Para cada característica: confirma, contradiz ou não se sabe. */

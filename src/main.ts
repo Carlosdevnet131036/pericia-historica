@@ -13,6 +13,7 @@ import { revelacao } from './ui/screens/revelacao';
 import { treino } from './ui/screens/treino';
 import { caseChanged, firstTime } from './ui/view-state';
 import { partnerBubble } from './ui/components/caso';
+import { notebook } from './ui/components/diario';
 
 const SCREENS: Record<Step, Screen> = { expediente, investigacao, treino, laboratorio, acusacao, revelacao };
 
@@ -72,6 +73,7 @@ function render(): void {
         { class: 'brand' },
         h('a', { class: 'brand-name', href: '#' }, 'Perícia Histórica'),
         h('span', { class: 'brand-case' }, `Caso ${caseFile.number} · ${caseFile.place.split(',')[0]}, ${caseFile.year}`),
+        h('button', { class: 'btn ghost journal-btn', type: 'button', onclick: () => openJournal(caseFile, store) }, 'Diário'),
       ),
       stepper(store, s.step, s.reached),
     );
@@ -95,6 +97,22 @@ function render(): void {
     window.scrollTo({ top: 0 });
     lastView = view;
   }
+}
+
+/**
+ * Diário em caderno num <dialog> modal: o navegador cuida do foco e do Esc.
+ * Mostra uma foto do estado no momento em que abre.
+ */
+function openJournal(caseFile: CaseFile, store: Store): void {
+  const dialog = h('dialog', { class: 'nb-dialog', 'aria-label': 'Diário de investigação' });
+  dialog.append(notebook(caseFile, store.get(), { onClose: () => dialog.close() }));
+  // Clique fora do caderno (no fundo escuro) também fecha.
+  dialog.addEventListener('click', (e) => {
+    if (e.target === dialog) dialog.close();
+  });
+  dialog.addEventListener('close', () => dialog.remove());
+  document.body.append(dialog);
+  dialog.showModal();
 }
 
 /**
