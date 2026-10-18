@@ -6,6 +6,7 @@ import type { Interactable } from '../interaction';
 import type { Vec2 } from '../motion';
 import { adobeTexture, dirtTexture, groundTexture, sizedBox, thatchTexture, woodTexture } from '../materials';
 import { buildProp, createGlint, glintTexture } from '../props';
+import { pbrMaterial, type TextureLibrary } from '../textures';
 import { buildVegetation } from '../vegetation';
 import type { ExploreSession, FindOutcome } from '../session';
 import { BENCH, DOOR_H, DOOR_X0, DOOR_X1, HOUSE_D, HOUSE_W, HOUSE_Z, INNER, QUARTO, RIDGE, SEARCH_SPOTS, TABLE, TRUNK, WALL_H, WALL_T, WINDOWS } from './rancho-layout';
@@ -112,15 +113,31 @@ function rng(seed: number) {
   };
 }
 
-export function buildRancho(getPlayer: () => Vec2, session: ExploreSession): SceneBuild {
+export function buildRancho(getPlayer: () => Vec2, session: ExploreSession, textures: TextureLibrary = {}): SceneBuild {
   const root = new THREE.Group();
   root.name = 'rancho';
   const r = rng(1892);
   const colliders: Collider[] = [];
 
-  const adobe = new THREE.MeshStandardMaterial({ map: adobeTexture(), roughness: 0.95 });
-  const thatch = new THREE.MeshStandardMaterial({ map: thatchTexture(), roughness: 1, side: THREE.DoubleSide });
-  const wood = new THREE.MeshStandardMaterial({ map: woodTexture(), roughness: 0.9 });
+  // Texturas fotográficas (Poly Haven, CC0) quando carregaram; senão, as
+  // geradas em código. As caixas têm UV em metros (sizedBox com tile 1), então
+  // a repetição é 1/(metros por repetição da textura).
+  const adobe = pbrMaterial(textures, 'parede', {
+    repeat: [1 / 1.5, 1 / 1.5],
+    fallback: () => new THREE.MeshStandardMaterial({ map: adobeTexture(), roughness: 0.95 }),
+  });
+  const thatch = pbrMaterial(textures, 'telhado', {
+    repeat: [1, 1],
+    side: THREE.DoubleSide,
+    fallback: () => new THREE.MeshStandardMaterial({ map: thatchTexture(), roughness: 1, side: THREE.DoubleSide }),
+  });
+  const wood = pbrMaterial(textures, 'madeira', {
+    repeat: [1, 1],
+    fallback: () => new THREE.MeshStandardMaterial({ map: woodTexture(), roughness: 0.9 }),
+  });
+  // Cilindros (postes, troncos) têm UV de 0 a 1: a repetição é por peça.
+  const bark = (rx: number, ry: number) =>
+    pbrMaterial(textures, 'casca', { repeat: [rx, ry], fallback: () => new THREE.MeshStandardMaterial({ map: woodTexture(), roughness: 0.9 }) });
 
   const add = <T extends THREE.Object3D>(o: T, shadow = true, parent: THREE.Object3D = root): T => {
     o.traverse((c) => {
@@ -134,7 +151,7 @@ export function buildRancho(getPlayer: () => Vec2, session: ExploreSession): Sce
   };
 
   /** Caixa visível que também é obstáculo, com a mesma posição e tamanho. */
-  const solidBox = (mat: THREE.Material, cx: number, cy: number, cz: number, w: number, h: number, d: number, flags?: { solid?: boolean; camera?: boolean }, tile = 3) => {
+  const solidBox = (mat: THREE.Material, cx: number, cy: number, cz: number, w: number, h: number, d: number, flags?: { solid?: boolean; camera?: boolean }, tile = 1) => {
     const mesh = new THREE.Mesh(sizedBox(w, h, d, tile), mat);
     mesh.position.set(cx, cy, cz);
     add(mesh);
@@ -144,13 +161,20 @@ export function buildRancho(getPlayer: () => Vec2, session: ExploreSession): Sce
 
   /* ---------- Chão ---------- */
 
-  const ground = new THREE.Mesh(new THREE.CircleGeometry(120, 48), new THREE.MeshStandardMaterial({ map: groundTexture(), color: 0x8fa38a, roughness: 1 }));
+  // O círculo do chão tem 240 m de diâmetro e UV de 0 a 1: 80 repetições = 3 m cada.
+  const ground = new THREE.Mesh(
+    new THREE.CircleGeometry(120, 48),
+    pbrMaterial(textures, 'campo', {
+      repeat: [80, 80],
+      fallback: () => new THREE.MeshStandardMaterial({ map: groundTexture(), color: 0x8fa38a, roughness: 1 }),
+    }),
+  );
   ground.rotation.x = -Math.PI / 2;
   ground.receiveShadow = true;
   root.add(ground);
 
-  const dirt = new THREE.MeshStandardMaterial({ map: dirtTexture(), roughness: 1 });
-  const yard = new THREE.Mesh(new THREE.CircleGeometry(7.5, 32), dirt);
+  const dirtFallback = () => new THREE.MeshStandardMaterial({ map: dirtTexture(), roughness: 1 });
+  const yard = new THREE.Mesh(new THREE.CircleGeometry(7.5, 32), pbrMaterial(textures, 'terra', { repeat: [6, 6], color: 0x8a7d6c, fallback: dirtFallback }));
   yard.rotation.x = -Math.PI / 2;
   yard.position.set(0, 0.01, HOUSE_Z + 5);
   yard.receiveShadow = true;
@@ -165,7 +189,10 @@ export function buildRancho(getPlayer: () => Vec2, session: ExploreSession): Sce
   const midY = WALL_H / 2;
 
   // Chão de terra batida por dentro.
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(HOUSE_W - WALL_T * 2, HOUSE_D - WALL_T * 2), dirt);
+  const floor = new THREE.Mesh(
+    new THREE.PlaneGeometry(HOUSE_W - WALL_T * 2, HOUSE_D - WALL_T * 2),
+    pbrMaterial(textures, 'terra', { repeat: [(HOUSE_W - WALL_T * 2) / 2, (HOUSE_D - WALL_T * 2) / 2], fallback: dirtFallback }),
+  );
   floor.rotation.x = -Math.PI / 2;
   floor.position.set(0, 0.02, HOUSE_Z);
   floor.receiveShadow = true;
@@ -182,7 +209,7 @@ export function buildRancho(getPlayer: () => Vec2, session: ExploreSession): Sce
 
   // Batentes de madeira no vão.
   for (const x of [DOOR_X0, DOOR_X1]) {
-    const jamb = new THREE.Mesh(new THREE.BoxGeometry(0.08, DOOR_H, WALL_T + 0.04), wood);
+    const jamb = new THREE.Mesh(sizedBox(0.08, DOOR_H, WALL_T + 0.04, 1), wood);
     jamb.position.set(x, DOOR_H / 2, fz);
     add(jamb);
   }
@@ -205,7 +232,7 @@ export function buildRancho(getPlayer: () => Vec2, session: ExploreSession): Sce
   const slope = Math.atan2(RIDGE, HOUSE_D / 2);
   const slopeLen = Math.hypot(RIDGE, HOUSE_D / 2) + 0.6;
   for (const side of [-1, 1]) {
-    const roof = new THREE.Mesh(new THREE.BoxGeometry(HOUSE_W + 0.9, 0.28, slopeLen), thatch);
+    const roof = new THREE.Mesh(sizedBox(HOUSE_W + 0.9, 0.28, slopeLen, 1), thatch);
     roof.rotation.x = -side * slope; // cada água sobe em direção à cumeeira
     roof.position.set(0, WALL_H + RIDGE / 2 + 0.05, HOUSE_Z - side * (HOUSE_D / 4 + 0.1));
     add(roof);
@@ -219,10 +246,10 @@ export function buildRancho(getPlayer: () => Vec2, session: ExploreSession): Sce
   const frameMat = wood;
   for (const x of [-2.8, 3]) {
     // Faces da caixa: +x, −x, +y, −y, +z (rua), −z (interior).
-    const w = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.6, WALL_T + 0.02), [frameMat, frameMat, frameMat, frameMat, glow, nightGlass]);
+    const w = new THREE.Mesh(sizedBox(0.75, 0.6, WALL_T + 0.02, 1), [frameMat, frameMat, frameMat, frameMat, glow, nightGlass]);
     w.position.set(x, 1.55, fz);
     add(w, false);
-    const sill = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.08, 0.16), wood);
+    const sill = new THREE.Mesh(sizedBox(0.95, 0.08, 0.16, 1), wood);
     sill.position.set(x, 1.21, front + 0.06);
     add(sill);
   }
@@ -231,7 +258,7 @@ export function buildRancho(getPlayer: () => Vec2, session: ExploreSession): Sce
 
   const hinge = new THREE.Group();
   hinge.position.set(DOOR_X1 - 0.04, 0, fz);
-  const doorLeaf = new THREE.Mesh(new THREE.BoxGeometry(DOOR_X1 - DOOR_X0 - 0.08, DOOR_H - 0.04, 0.08), wood);
+  const doorLeaf = new THREE.Mesh(sizedBox(DOOR_X1 - DOOR_X0 - 0.08, DOOR_H - 0.04, 0.08, 1), wood);
   doorLeaf.position.set(-(DOOR_X1 - DOOR_X0 - 0.08) / 2, DOOR_H / 2, 0);
   add(doorLeaf, true, hinge);
   root.add(hinge);
@@ -249,11 +276,11 @@ export function buildRancho(getPlayer: () => Vec2, session: ExploreSession): Sce
 
   // Mesa rústica, banco e baú na sala.
   const table = new THREE.Group();
-  const top = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.06, 0.8), wood);
+  const top = new THREE.Mesh(sizedBox(1.4, 0.06, 0.8, 1), wood);
   top.position.y = 0.76;
   table.add(top);
   for (const [lx, lz] of [[-0.62, -0.32], [0.62, -0.32], [-0.62, 0.32], [0.62, 0.32]] as const) {
-    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.73, 0.07), wood);
+    const leg = new THREE.Mesh(sizedBox(0.07, 0.73, 0.07, 1), wood);
     leg.position.set(lx, 0.365, lz);
     table.add(leg);
   }
@@ -261,11 +288,11 @@ export function buildRancho(getPlayer: () => Vec2, session: ExploreSession): Sce
   add(table);
   colliders.push(box(TABLE.x, 0.4, TABLE.z, 1.4, 0.8, 0.8, { camera: false }));
 
-  const bench = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.08, 0.32), wood);
+  const bench = new THREE.Mesh(sizedBox(1.2, 0.08, 0.32, 1), wood);
   bench.position.set(BENCH.x, 0.44, BENCH.z);
   add(bench);
   for (const lx of [-0.5, 0.5]) {
-    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.42, 0.28), wood);
+    const leg = new THREE.Mesh(sizedBox(0.08, 0.42, 0.28, 1), wood);
     leg.position.set(BENCH.x + lx, 0.21, BENCH.z);
     add(leg);
   }
@@ -274,7 +301,7 @@ export function buildRancho(getPlayer: () => Vec2, session: ExploreSession): Sce
   solidBox(wood, TRUNK.x, TRUNK.top / 2, TRUNK.z, 1, TRUNK.top, 0.55, { camera: false }, 1);
 
   // Peitoril interno da janela da sala (onde fica o pente).
-  const innerSill = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.06, 0.18), wood);
+  const innerSill = new THREE.Mesh(sizedBox(0.95, 0.06, 0.18, 1), wood);
   innerSill.position.set(WINDOWS[0], 1.22, INNER.z1 - 0.08);
   add(innerSill);
 
@@ -290,7 +317,7 @@ export function buildRancho(getPlayer: () => Vec2, session: ExploreSession): Sce
   const jambDepth = QUARTO.t + 0.06;
   const jambZ = [QUARTO.z0 + QUARTO.jamb / 2, QUARTO.z1 - QUARTO.jamb / 2] as const;
   for (const z of jambZ) solidBox(paleWood, QUARTO.x, DOOR_H / 2, z, jambDepth, DOOR_H, QUARTO.jamb, { camera: false }, 1);
-  const lintel = new THREE.Mesh(new THREE.BoxGeometry(jambDepth, 0.08, QUARTO.z1 - QUARTO.z0), paleWood);
+  const lintel = new THREE.Mesh(sizedBox(jambDepth, 0.08, QUARTO.z1 - QUARTO.z0, 1), paleWood);
   lintel.position.set(QUARTO.x, DOOR_H + 0.04, (QUARTO.z0 + QUARTO.z1) / 2);
   add(lintel);
 
@@ -338,15 +365,16 @@ export function buildRancho(getPlayer: () => Vec2, session: ExploreSession): Sce
 
   /* ---------- Ramada: alpendre de troncos e galhos em frente à porta ---------- */
 
+  const postBark = bark(0.5, 2);
   for (const x of [-3.6, -1.2, 1.2, 3.6]) {
     const px = x + (r() - 0.5) * 0.1;
-    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 2.35, 6), wood);
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 2.35, 6), postBark);
     post.position.set(px, 1.17, front + 2.1);
     post.rotation.z = (r() - 0.5) * 0.06;
     add(post);
     colliders.push(circle(px, front + 2.1, 0.1, 2.35));
   }
-  const ramada = new THREE.Mesh(new THREE.BoxGeometry(8, 0.1, 2.4), wood);
+  const ramada = new THREE.Mesh(sizedBox(8, 0.1, 2.4, 1), wood);
   ramada.position.set(0, 2.38, front + 1.15);
   ramada.rotation.x = 0.09;
   add(ramada);
@@ -363,7 +391,7 @@ export function buildRancho(getPlayer: () => Vec2, session: ExploreSession): Sce
     fencePoints.push(new THREE.Vector3(corral.x1, 0, z));
     if (z < gateZ) fencePoints.push(new THREE.Vector3(corral.x0, 0, z)); // porteira aberta
   }
-  const fence = new THREE.InstancedMesh(postGeo, wood, fencePoints.length);
+  const fence = new THREE.InstancedMesh(postGeo, bark(0.4, 1), fencePoints.length);
   const m = new THREE.Matrix4();
   fencePoints.forEach((p, i) => {
     const h = 1.1 + r() * 0.5;
@@ -387,7 +415,7 @@ export function buildRancho(getPlayer: () => Vec2, session: ExploreSession): Sce
 
   const leaves = new THREE.MeshStandardMaterial({ color: 0x1f2a17, roughness: 1, flatShading: true });
   const tree = new THREE.Group();
-  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 1.1, 3.2, 8), wood);
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 1.1, 3.2, 8), bark(3, 2.5));
   trunk.position.y = 1.6;
   tree.add(trunk);
   for (let i = 0; i < 6; i++) {
@@ -404,6 +432,8 @@ export function buildRancho(getPlayer: () => Vec2, session: ExploreSession): Sce
   const yardZ = HOUSE_Z + 5;
   const vegetation = buildVegetation({
     seed: 1892,
+    // Casca de eucalipto: tronco de ~12 m, UV de 0 a 1 em altura.
+    bark: pbrMaterial(textures, 'eucalipto', { repeat: [1, 6], fallback: () => new THREE.MeshStandardMaterial({ color: 0x6d6658, roughness: 0.9 }) }),
     blocked: (x, z) => {
       const nearHouse = Math.abs(x) < HOUSE_W / 2 + 1.2 && z > HOUSE_Z - HOUSE_D / 2 - 1.2 && z < front + 3.2;
       const inYard = Math.hypot(x, z - yardZ) < 6.8;

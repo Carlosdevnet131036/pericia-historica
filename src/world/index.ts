@@ -11,8 +11,10 @@ import { createPlayer } from './player';
 import { createPost, type Post } from './post';
 import { buildRancho, PLAYER_RADIUS, type ExamineInfo, type SceneInteractable } from './scenes/rancho';
 import type { ExploreSession } from './session';
+import type { TextureLibrary } from './textures';
 
 export { createSession } from './session';
+export { loadTextures } from './textures';
 
 /**
  * Ponto de entrada do modo 3D. Este arquivo (e o Three.js) só é baixado
@@ -24,6 +26,8 @@ export interface WorldOptions {
   backHref: string;
   /** Progresso da busca deste lugar, compartilhado com a versão 2D. */
   session: ExploreSession;
+  /** Texturas fotográficas já carregadas (as que faltarem usam as de código). */
+  textures?: TextureLibrary;
 }
 
 export interface WorldHandle {
@@ -126,7 +130,7 @@ export function mountWorld(container: HTMLElement, opts: WorldOptions): WorldHan
 
   const player = createPlayer();
   const { session } = opts;
-  const world = buildRancho(() => ({ x: player.root.position.x, z: player.root.position.z }), session);
+  const world = buildRancho(() => ({ x: player.root.position.x, z: player.root.position.z }), session, opts.textures);
   scene.add(world.root);
   player.root.position.copy(world.spawn);
   player.root.rotation.y = Math.PI; // de frente para a casa

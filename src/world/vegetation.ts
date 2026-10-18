@@ -15,6 +15,8 @@ export interface VegetationOptions {
   /** Pontos onde não deve nascer nada (casa, terreiro, curral...). */
   blocked(x: number, z: number): boolean;
   seed: number;
+  /** Material dos troncos de eucalipto (textura fotográfica, quando houver). */
+  bark?: THREE.Material;
 }
 
 export interface Vegetation {
@@ -162,7 +164,7 @@ export function buildVegetation(opts: VegetationOptions): Vegetation {
 
   /* ---------- Quebra-vento de eucaliptos atrás da casa (dramatizado) ---------- */
 
-  const barkMat = new THREE.MeshStandardMaterial({ color: 0x6d6658, roughness: 0.9 });
+  const barkMat = opts.bark ?? new THREE.MeshStandardMaterial({ color: 0x6d6658, roughness: 0.9 });
   const crownMat = new THREE.MeshStandardMaterial({ color: 0x1c2a22, roughness: 1, flatShading: true });
   const trunkGeo = new THREE.CylinderGeometry(0.14, 0.3, 1, 7);
   const crownGeo = new THREE.IcosahedronGeometry(1, 0);

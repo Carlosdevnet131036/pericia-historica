@@ -177,9 +177,15 @@ async function open3d(caseFile: CaseFile): Promise<void> {
     if (!mod.webglAvailable()) throw new Error('webgl');
     document.title = `${place?.name ?? caseFile.title} (3D) · Perícia Histórica`;
     if (!place) throw new Error('sem lugar 3D');
+    // Texturas fotográficas (~3 MB): o progresso aparece na tela de carregamento.
+    const status = root!.querySelector('.world-loading');
+    const textures = await mod.loadTextures((done, total) => {
+      if (status) status.textContent = `Carregando texturas… ${done} de ${total}`;
+    });
+    if (location.hash !== `#${caseFile.id}/3d`) return;
     // O 3D grava no mesmo save do caso: o que for achado lá aparece na versão 2D.
     const session = mod.createSession(new Store(caseFile.id), caseFile, place);
-    world = mod.mountWorld(root!, { caseTitle: `Caso ${caseFile.number} · ${caseFile.title}`, locationName: place.name, backHref: back, session });
+    world = mod.mountWorld(root!, { caseTitle: `Caso ${caseFile.number} · ${caseFile.title}`, locationName: place.name, backHref: back, session, textures });
   } catch (err) {
     const noWebgl = err instanceof Error && err.message === 'webgl';
     root!.replaceChildren(
