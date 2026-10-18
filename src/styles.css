@@ -1936,6 +1936,8 @@ a.case-card:hover {
   position: absolute;
   top: calc(14px + env(safe-area-inset-top, 0px));
   left: max(16px, env(safe-area-inset-left, 0px));
+  /* Deixa espaço para o contador no canto direito (em telas estreitas, quebra a linha). */
+  max-width: calc(100% - 220px);
   pointer-events: none;
   text-shadow: 0 1px 3px rgb(0 0 0 / 0.8);
 }
@@ -2447,4 +2449,24 @@ a.case-card:hover {
   box-shadow: none;
   padding: 0;
   width: min(1100px, 100%);
+}
+
+/* Botões de pausa e saída durante o jogo 3D, no canto inferior direito. */
+.world-controls {
+  position: absolute;
+  right: max(16px, env(safe-area-inset-right, 0px));
+  bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  gap: 8px;
+}
+
+.world-controls .btn {
+  background: rgb(11 16 24 / 0.7);
+  font-size: 0.85rem;
+  padding: 6px 12px;
+}
+
+.explore3d-note {
+  border-left: 3px solid var(--rule);
+  padding-left: 10px;
 }
