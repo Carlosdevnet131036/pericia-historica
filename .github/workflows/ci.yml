@@ -62,9 +62,9 @@ jobs:
 
   publicar:
     name: Publicar no GitHub Pages
-    # Só publica a main, e só depois que testes, build e auditoria passaram.
+    # Só publica a main, e só depois que testes, build, auditoria e testes de navegador passaram.
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [verificar, auditoria]
+    needs: [verificar, auditoria, e2e]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     # Permissões de escrita só neste job, não no pipeline inteiro.
@@ -91,3 +91,38 @@ jobs:
 
       # Falha só para severidade alta ou crítica; as moderadas aparecem no log.
       - run: npm audit --audit-level=high
+
+  e2e:
+    name: Testes de navegador (Playwright)
+    # Só os fluxos de ponta a ponta: typecheck, testes unitários e build já
+    # rodam no job "verificar" e não são repetidos aqui.
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      # O Chromium da versão fixada do @playwright/test e as bibliotecas de
+      # sistema que ele exige no Ubuntu do runner.
+      - name: Instalar o Chromium do Playwright
+        run: npx playwright install --with-deps chromium
+
+      # O próprio Playwright sobe o servidor Vite (playwright.config.ts).
+      - name: Testes de navegador
+        run: npm run e2e
+
+      - name: Guardar relatório e rastros (só em falha)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: relatorio-playwright
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
