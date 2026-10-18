@@ -8,6 +8,7 @@ import { Input } from './input';
 import { pickInteractable } from './interaction';
 import { clampPitch, clampToRadius, headingOf, moveDelta, orbitPosition, turnTowards } from './motion';
 import { createPlayer } from './player';
+import { createPost, type Post } from './post';
 import { buildRancho, PLAYER_RADIUS, type ExamineInfo, type SceneInteractable } from './scenes/rancho';
 import type { ExploreSession } from './session';
 
@@ -35,6 +36,24 @@ const CAMERA_DISTANCE = 4.6;
 const HEAD_HEIGHT = 1.65;
 /** Com a câmera mais perto que isso, ela estaria dentro do personagem: ele some. */
 const HIDE_PLAYER_BELOW = 0.7;
+const QUALITY_KEY = 'pericia-historica:3d-graficos';
+
+/** Preferência só deste navegador: perder o valor não quebra nada. */
+function loadQuality(): boolean {
+  try {
+    return localStorage.getItem(QUALITY_KEY) !== 'baixo';
+  } catch {
+    return true;
+  }
+}
+
+function saveQuality(high: boolean): void {
+  try {
+    localStorage.setItem(QUALITY_KEY, high ? 'alto' : 'baixo');
+  } catch {
+    // sem armazenamento: a escolha vale só nesta sessão
+  }
+}
 
 const NATURE_LABEL: Record<ExamineInfo['nature'], string> = {
   dramatizado: 'Reconstrução dramatizada',
@@ -90,15 +109,18 @@ export function mountWorld(container: HTMLElement, opts: WorldOptions): WorldHan
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.5;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
+  // Com pós-processamento há várias renderizações por quadro; as estatísticas
+  // são zeradas à mão no início do quadro para medir o quadro inteiro.
+  renderer.info.autoReset = false;
   renderer.domElement.className = 'world-canvas';
   renderer.domElement.tabIndex = 0;
   container.append(renderer.domElement);
 
   const scene = new THREE.Scene();
   // Noite verde-azulada, como na referência: escura, mas legível.
-  const night = new THREE.Color(0x16202b);
+  const night = new THREE.Color(0x10201f);
   scene.background = night;
-  scene.fog = new THREE.FogExp2(night, 0.02);
+  scene.fog = new THREE.FogExp2(night, 0.034);
 
   const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 400);
 
@@ -109,6 +131,21 @@ export function mountWorld(container: HTMLElement, opts: WorldOptions): WorldHan
   player.root.position.copy(world.spawn);
   player.root.rotation.y = Math.PI; // de frente para a casa
   scene.add(player.root);
+
+  /* ---------- Qualidade gráfica ---------- */
+
+  let high = loadQuality();
+  let post: Post | null = null;
+  const applyQuality = () => {
+    world.setQuality(high);
+    if (high && !post) {
+      post = createPost(renderer, scene, camera);
+      post.setSize(container.clientWidth || window.innerWidth, container.clientHeight || window.innerHeight);
+    } else if (!high && post) {
+      post.dispose();
+      post = null;
+    }
+  };
 
   /* ---------- Interface sobreposta ---------- */
 
@@ -193,7 +230,15 @@ export function mountWorld(container: HTMLElement, opts: WorldOptions): WorldHan
           : `Reconstrução dramatizada de um rancho do pampa em 1892. Encontre e examine os ${session.targets.length} objetos da busca (E) para liberar os cartões deste lugar. O relógio começa quando você entra. O que achar aqui vale também na versão 2D.`
         : 'O jogo está pausado.';
     card.className = 'world-card';
-    card.replaceChildren(el('h2', '', title), el('p', '', text), actions(next === 'intro' ? 'Explorar' : 'Continuar'));
+    const quality = el('button', 'btn ghost world-quality', `Gráficos: ${high ? 'alto' : 'baixo'}`);
+    quality.title = 'Baixo desliga brilho, gradação de cor e sombras da lamparina, e reduz o capim';
+    quality.addEventListener('click', () => {
+      high = !high;
+      saveQuality(high);
+      applyQuality();
+      quality.textContent = `Gráficos: ${high ? 'alto' : 'baixo'}`;
+    });
+    card.replaceChildren(el('h2', '', title), el('p', '', text), actions(next === 'intro' ? 'Explorar' : 'Continuar'), quality);
   }
 
   /** Painel de exame: o mouse é liberado para ler e clicar; E ou o botão voltam. */
@@ -265,10 +310,12 @@ export function mountWorld(container: HTMLElement, opts: WorldOptions): WorldHan
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
+    post?.setSize(w, h);
   };
   const observer = new ResizeObserver(resize);
   observer.observe(container);
   resize();
+  applyQuality();
 
   /* ---------- Loop ---------- */
 
@@ -285,6 +332,7 @@ export function mountWorld(container: HTMLElement, opts: WorldOptions): WorldHan
 
   const tick = (now?: number) => {
     frame = requestAnimationFrame(tick);
+    renderer.info.reset();
     timer.update(now);
     // Passo limitado: se o jogo engasgar, ninguém atravessa paredes num salto.
     const dt = Math.min(timer.getDelta(), 0.05);
@@ -326,7 +374,8 @@ export function mountWorld(container: HTMLElement, opts: WorldOptions): WorldHan
     camera.lookAt(target);
     player.root.visible = camDist > HIDE_PLAYER_BELOW;
 
-    renderer.render(scene, camera);
+    if (post) post.render();
+    else renderer.render(scene, camera);
   };
   tick();
 
@@ -349,6 +398,9 @@ export function mountWorld(container: HTMLElement, opts: WorldOptions): WorldHan
       get found() {
         return session.foundCount();
       },
+      get view() {
+        return { yaw, pitch };
+      },
       place(x: number, z: number, viewYaw = yaw, viewPitch = pitch) {
         player.root.position.set(x, 0, z);
         target.set(x, HEAD_HEIGHT, z);
@@ -363,6 +415,7 @@ export function mountWorld(container: HTMLElement, opts: WorldOptions): WorldHan
     dispose() {
       cancelAnimationFrame(frame);
       timer.dispose();
+      post?.dispose();
       observer.disconnect();
       document.removeEventListener('pointerlockchange', onLockChange);
       input.dispose();

@@ -6,6 +6,7 @@ import type { Interactable } from '../interaction';
 import type { Vec2 } from '../motion';
 import { adobeTexture, dirtTexture, groundTexture, sizedBox, thatchTexture, woodTexture } from '../materials';
 import { buildProp, createGlint, glintTexture } from '../props';
+import { buildVegetation } from '../vegetation';
 import type { ExploreSession, FindOutcome } from '../session';
 import { BENCH, DOOR_H, DOOR_X0, DOOR_X1, HOUSE_D, HOUSE_W, HOUSE_Z, INNER, QUARTO, RIDGE, SEARCH_SPOTS, TABLE, TRUNK, WALL_H, WALL_T, WINDOWS } from './rancho-layout';
 
@@ -50,12 +51,14 @@ export interface SceneBuild {
   colliders(): readonly Collider[];
   interactables: SceneInteractable[];
   update(time: number, dt: number): void;
+  /** Gráficos alto/baixo: sombras da lamparina e densidade do capim. */
+  setQuality(high: boolean): void;
 }
 
 /** Raio do jogador para as colisões, o mesmo usado em index.ts. */
 export const PLAYER_RADIUS = 0.3;
 /** Intensidade da lamparina e da claridade que escapa para o terreiro (calibradas para exposição 1,5). */
-const LAMP_POWER = 2.2;
+const LAMP_POWER = 1.0;
 const SPILL_POWER = 16;
 
 /** Descrições dos objetos da busca: peças de cena, sem relação com os fatos do caso. */
@@ -141,7 +144,7 @@ export function buildRancho(getPlayer: () => Vec2, session: ExploreSession): Sce
 
   /* ---------- Chão ---------- */
 
-  const ground = new THREE.Mesh(new THREE.CircleGeometry(120, 48), new THREE.MeshStandardMaterial({ map: groundTexture(), roughness: 1 }));
+  const ground = new THREE.Mesh(new THREE.CircleGeometry(120, 48), new THREE.MeshStandardMaterial({ map: groundTexture(), color: 0x8fa38a, roughness: 1 }));
   ground.rotation.x = -Math.PI / 2;
   ground.receiveShadow = true;
   root.add(ground);
@@ -324,6 +327,13 @@ export function buildRancho(getPlayer: () => Vec2, session: ExploreSession): Sce
   const lampSpot = SEARCH_SPOTS.lamparina ?? { x: TABLE.x, y: TABLE.top, z: TABLE.z };
   const lampLight = new THREE.PointLight(0xffa04a, LAMP_POWER, 7, 1.6);
   lampLight.position.set(lampSpot.x, 1.1, lampSpot.z);
+  // Sombra da lamparina: as paredes e os móveis passam a bloquear a luz, e
+  // ela não atravessa mais as paredes para o lado de fora. Custa 6 passadas
+  // extras (um cubo de sombra), por isso some no modo de gráficos baixo.
+  lampLight.shadow.mapSize.set(512, 512);
+  lampLight.shadow.camera.near = 0.05;
+  lampLight.shadow.camera.far = 7;
+  lampLight.shadow.bias = -0.003;
   root.add(lampLight);
 
   /* ---------- Ramada: alpendre de troncos e galhos em frente à porta ---------- */
@@ -389,23 +399,22 @@ export function buildRancho(getPlayer: () => Vec2, session: ExploreSession): Sce
   add(tree);
   colliders.push(circle(-10, -3, 0.95, 3.2));
 
-  /* ---------- Vegetação baixa (instanciada: uma chamada de desenho) ---------- */
+  /* ---------- Vegetação, pedras e árvores ---------- */
 
-  const tufts: THREE.Vector3[] = [];
-  while (tufts.length < 500) {
-    const x = (r() - 0.5) * 70;
-    const z = (r() - 0.5) * 70;
-    const nearHouse = Math.abs(x) < HOUSE_W / 2 + 2 && z > HOUSE_Z - HOUSE_D && z < front + 5;
-    if (!nearHouse) tufts.push(new THREE.Vector3(x, 0, z));
-  }
-  const tuftMesh = new THREE.InstancedMesh(new THREE.ConeGeometry(0.12, 0.32, 4), new THREE.MeshStandardMaterial({ color: 0x55603a, roughness: 1, flatShading: true }), tufts.length);
-  tufts.forEach((p, i) => {
-    const s = 0.6 + r() * 0.8;
-    m.compose(new THREE.Vector3(p.x, 0.16 * s, p.z), new THREE.Quaternion(), new THREE.Vector3(s, s, s));
-    tuftMesh.setMatrixAt(i, m);
+  const yardZ = HOUSE_Z + 5;
+  const vegetation = buildVegetation({
+    seed: 1892,
+    blocked: (x, z) => {
+      const nearHouse = Math.abs(x) < HOUSE_W / 2 + 1.2 && z > HOUSE_Z - HOUSE_D / 2 - 1.2 && z < front + 3.2;
+      const inYard = Math.hypot(x, z - yardZ) < 6.8;
+      const nearTree = Math.hypot(x + 10, z + 3) < 1.6;
+      // Nada cresce em cima dos objetos da busca: escondê-los no capim seria injusto.
+      const onSpot = Object.values(SEARCH_SPOTS).some((sp) => sp && Math.hypot(x - sp.x, z - sp.z) < 1.1);
+      return nearHouse || inYard || nearTree || onSpot;
+    },
   });
-  tuftMesh.receiveShadow = true;
-  root.add(tuftMesh);
+  root.add(vegetation.root);
+  colliders.push(...vegetation.colliders);
 
   /* ---------- Céu: estrelas e lua ---------- */
 
@@ -420,15 +429,19 @@ export function buildRancho(getPlayer: () => Vec2, session: ExploreSession): Sce
   root.add(new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xcfd6e0, size: 1.4, sizeAttenuation: false, fog: false })));
 
   const moonDir = new THREE.Vector3(-0.5, 0.6, -0.62).normalize();
-  const moon = new THREE.Mesh(new THREE.SphereGeometry(5, 16, 12), new THREE.MeshBasicMaterial({ color: 0xe8e4d6, fog: false }));
+  // Cor acima de 1 (HDR): a lua passa do limiar do bloom e ganha um halo.
+  const moon = new THREE.Mesh(new THREE.SphereGeometry(5, 16, 12), new THREE.MeshBasicMaterial({ color: new THREE.Color(2.2, 2.2, 2.0), fog: false }));
   moon.position.copy(moonDir.clone().multiplyScalar(180));
   root.add(moon);
 
   /* ---------- Luzes ---------- */
 
-  root.add(new THREE.HemisphereLight(0x6f8fae, 0x2a2418, 1.7));
+  // Noite verde-azulada (como a referência): céu frio, chão escuro. A luz
+  // ambiente não conhece paredes (ilumina o interior como o exterior), então
+  // fica fraca: fora, quem ilumina é o luar (com sombra); dentro, a lamparina.
+  root.add(new THREE.HemisphereLight(0x5f8f8a, 0x1d2418, 0.75));
 
-  const moonLight = new THREE.DirectionalLight(0xb4c8e4, 2.4);
+  const moonLight = new THREE.DirectionalLight(0xa9cfc4, 3.2);
   moonLight.position.copy(moonDir.clone().multiplyScalar(30));
   moonLight.castShadow = true;
   moonLight.shadow.mapSize.set(2048, 2048);
@@ -496,7 +509,12 @@ export function buildRancho(getPlayer: () => Vec2, session: ExploreSession): Sce
     boundsRadius: 30,
     colliders: () => [...colliders, doorIsOpen ? doorOpen : doorClosed],
     interactables,
+    setQuality(high: boolean) {
+      lampLight.castShadow = high;
+      vegetation.setDensity(high ? 1 : 0.4);
+    },
     update(time: number, dt: number) {
+      vegetation.update(time);
       // A chama da lamparina tremula, e a claridade lá fora acompanha.
       const flicker = 0.88 + Math.sin(time * 7.3) * 0.06 + Math.sin(time * 13.1) * 0.04;
       warm.intensity = SPILL_POWER * flicker;

@@ -31,6 +31,9 @@ export interface InputHandlers {
   journal?(): void;
 }
 
+/** Maior deslocamento aceito num único evento de mouse, em pixels. */
+const MAX_EVENT_DELTA = 250;
+
 export class Input {
   readonly move: MoveInput = { forward: false, back: false, left: false, right: false, run: false };
   /** Movimento do mouse acumulado desde a última leitura, em pixels. */
@@ -56,6 +59,8 @@ export class Input {
     document.addEventListener(
       'pointerlockchange',
       () => {
+        // Ao travar ou soltar o ponteiro, o movimento acumulado não vale mais.
+        this.dx = this.dy = 0;
         if (!this.locked) this.releaseAll();
       },
       opts,
@@ -101,6 +106,10 @@ export class Input {
 
   private mouse(e: MouseEvent): void {
     if (!this.locked && !this.dragging) return;
+    // Logo após travar o ponteiro, o navegador às vezes entrega um evento com
+    // um salto enorme e falso (a câmera "pula"). Um gesto real se espalha por
+    // vários eventos pequenos, então um salto isolado desse tamanho é descartado.
+    if (Math.abs(e.movementX) > MAX_EVENT_DELTA || Math.abs(e.movementY) > MAX_EVENT_DELTA) return;
     this.dx += e.movementX;
     this.dy += e.movementY;
   }
