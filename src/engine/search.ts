@@ -81,9 +81,13 @@ export function hitTarget(placements: Placement[], found: string[], x: number, y
   return best;
 }
 
+/** Pontos descontados por clique errado e por dica (a interface mostra os mesmos valores). */
+export const MISS_PENALTY = 60;
+export const HINT_PENALTY = 120;
+
 /** Pontuação da cena: tempo, erros e dicas descontam de 1000. */
 export function searchScore(elapsedSec: number, misclicks: number, hints: number): number {
-  return Math.max(0, Math.round(1000 - elapsedSec * 8 - misclicks * 60 - hints * 120));
+  return Math.max(0, Math.round(1000 - elapsedSec * 8 - misclicks * MISS_PENALTY - hints * HINT_PENALTY));
 }
 
 export function searchStars(score: number): number {

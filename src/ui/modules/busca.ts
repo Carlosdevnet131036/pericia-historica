@@ -3,10 +3,12 @@ import {
   beginSearch,
   EMPTY_SEARCH,
   finishSearch,
+  HINT_PENALTY,
   HIT_RADIUS,
   hitTarget,
   isRunning,
   layoutSearch,
+  MISS_PENALTY,
   pauseSearch,
   progressScore,
   resumeSearch,
@@ -26,13 +28,30 @@ import type { ScreenContext } from '../screens/context';
 
 const EMPTY: SearchProgress = EMPTY_SEARCH;
 
-/* Estado só de tela: último erro (para o X vermelho) e alvo da dica. */
+/* Estado só de tela: último erro (para o X vermelho), alvo da dica e o
+   último achado, que anima uma vez só na renderização seguinte ao clique. */
 let lastMiss: { x: number; y: number; at: number } | null = null;
 let hintTarget: string | null = null;
+let lastFound: { locId: string; id: string; completed: boolean } | null = null;
+/** Mensagem para leitores de tela (região aria-live), da última ação. */
+let announcement = '';
 onCaseChange(() => {
   lastMiss = null;
   hintTarget = null;
+  lastFound = null;
+  announcement = '';
 });
+
+/**
+ * Texto flutuante na cena (o helper `s` só aceita elementos como filhos).
+ * Perto das bordas, muda de alinhamento para não sair da cena.
+ */
+function svgText(cls: string, x: number, y: number, text: string): SVGTextElement {
+  const anchor = x < 80 ? 'start' : x > SEARCH_W - 80 ? 'end' : 'middle';
+  const t = s('text', { class: cls, x: Math.min(Math.max(x, 8), SEARCH_W - 8), y, 'text-anchor': anchor });
+  t.textContent = text;
+  return t;
+}
 
 // Um único relógio para todas as cenas: atualiza o texto sem redesenhar a tela.
 // O tempo mostrado é o tempo ativo (base acumulada + trecho atual).
@@ -112,6 +131,10 @@ export function searchPanel(ctx: ScreenContext, loc: Location): HTMLElement {
   const started = p.startedAt !== null;
   const done = p.elapsedMs !== null;
   if (started && !done) visibleScene = { store, locId: loc.id };
+  // Consome o achado: só esta renderização anima (a próxima já mostra o estado final).
+  const fx = lastFound?.locId === loc.id ? lastFound : null;
+  if (fx) lastFound = null;
+  const missFresh = lastMiss !== null && Date.now() - lastMiss.at < 700;
 
   const save = (next: Partial<SearchProgress>) =>
     store.update((st) => ({ ...st, search: { ...st.search, [loc.id]: { ...(st.search[loc.id] ?? EMPTY), ...next } } }));
@@ -131,15 +154,30 @@ export function searchPanel(ctx: ScreenContext, loc: Location): HTMLElement {
   for (const o of placements) {
     const g = placedObject(o.id, hatch, o.x, o.y, o.rotation, o.scale);
     if (o.target && p.found.includes(o.id)) g.classList.add('is-found');
+    if (o.target && fx?.id === o.id) g.classList.add('just-found');
     root.append(g);
+  }
+  // Achado: círculo de tinta desenhado em volta do objeto e o nome subindo.
+  const foundAt = fx ? placements.find((o) => o.target && o.id === fx.id) : undefined;
+  if (foundAt) {
+    const r = HIT_RADIUS * foundAt.scale + 6;
+    root.append(
+      s('circle', { class: 'found-ring', cx: foundAt.x, cy: foundAt.y, r, pathLength: 1 }),
+      // Perto da borda de cima, o nome vai abaixo do objeto.
+      svgText('found-float', foundAt.x, foundAt.y - r - 6 < 24 ? foundAt.y + r + 20 : foundAt.y - r - 6, `${OBJECT_NAMES[foundAt.id]} ✓`),
+    );
   }
   if (hintTarget && !p.found.includes(hintTarget)) {
     const t = placements.find((o) => o.id === hintTarget && o.target);
     if (t) root.append(s('circle', { class: 'hint-ring', cx: t.x, cy: t.y, r: HIT_RADIUS * t.scale + 8 }));
   }
-  if (lastMiss && Date.now() - lastMiss.at < 700) {
+  if (lastMiss && missFresh) {
     const { x, y } = lastMiss;
-    root.append(s('path', { class: 'miss-mark', d: `M ${x - 10} ${y - 10} L ${x + 10} ${y + 10} M ${x + 10} ${y - 10} L ${x - 10} ${y + 10}` }));
+    root.append(
+      s('path', { class: 'miss-mark', d: `M ${x - 10} ${y - 10} L ${x + 10} ${y + 10} M ${x + 10} ${y - 10} L ${x - 10} ${y + 10}` }),
+      // O custo aparece no lugar do erro: ensina a regra sem precisar de texto.
+      svgText('miss-cost', x, y - 16 < 20 ? y + 30 : y - 16, `−${MISS_PENALTY}`),
+    );
   }
 
   if (started && !done) {
@@ -150,20 +188,30 @@ export function searchPanel(ctx: ScreenContext, loc: Location): HTMLElement {
       const hit = hitTarget(placements, p.found, pt.x, pt.y);
       if (!hit) {
         lastMiss = { x: pt.x, y: pt.y, at: Date.now() };
+        announcement = `Nada aqui. Menos ${MISS_PENALTY} pontos.`;
         save({ misclicks: p.misclicks + 1 });
         return;
       }
       if (hintTarget === hit.id) hintTarget = null;
       const found = [...p.found, hit.id];
-      if (found.length < spec.targets.length) {
+      const completed = found.length === spec.targets.length;
+      lastFound = { locId: loc.id, id: hit.id, completed };
+      // Forma neutra: o gênero muda de objeto para objeto (a chave, o botão).
+      announcement = `Achou: ${OBJECT_NAMES[hit.id]}. ${found.length} de ${spec.targets.length}.`;
+      if (!completed) {
         save({ found });
         return;
       }
       const done = finishSearch({ ...p, found }, Date.now(), '2d');
       const score = searchScore((done.elapsedMs ?? 0) / 1000, p.misclicks, p.hints);
-      save({ ...done, bestStars: Math.max(p.bestStars, searchStars(score)) });
-      // Completar a cena conta como visitar o lugar.
-      store.update((st) => (st.visited.includes(loc.id) ? st : { ...st, visited: [...st.visited, loc.id] }));
+      announcement += ` Busca concluída: ${searchStars(score)} de 5 estrelas.`;
+      // Uma gravação só (resultado + lugar visitado): uma segunda renderização
+      // logo em seguida apagaria a animação do último achado.
+      store.update((st) => ({
+        ...st,
+        search: { ...st.search, [loc.id]: { ...done, bestStars: Math.max(p.bestStars, searchStars(score)) } },
+        visited: st.visited.includes(loc.id) ? st.visited : [...st.visited, loc.id],
+      }));
     });
   }
 
@@ -172,7 +220,7 @@ export function searchPanel(ctx: ScreenContext, loc: Location): HTMLElement {
   const list = h(
     'ul',
     { class: 'search-list' },
-    ...spec.targets.map((id) => h('li', { class: p.found.includes(id) ? 'is-found' : '' }, OBJECT_NAMES[id])),
+    ...spec.targets.map((id) => h('li', { class: `${p.found.includes(id) ? 'is-found' : ''}${fx?.id === id ? ' just-found' : ''}`.trim() }, OBJECT_NAMES[id])),
   );
 
   const hint = () => {
@@ -195,8 +243,8 @@ export function searchPanel(ctx: ScreenContext, loc: Location): HTMLElement {
             { class: 'search-timer', 'data-base': String(p.activeMs ?? 0), 'data-since': isRunning(p) ? String(p.runningSince) : undefined },
             formatTime(searchElapsed(p, Date.now())),
           ),
-          h('span', {}, `Erros: ${p.misclicks}`),
-          h('button', { class: 'btn ghost', onclick: hint }, 'Dica (−120)'),
+          h('span', { class: `search-misses${missFresh ? ' just-missed' : ''}` }, `Erros: ${p.misclicks}`),
+          h('button', { class: 'btn ghost', onclick: hint }, `Dica (−${HINT_PENALTY})`),
         )
       : null,
   );
@@ -215,7 +263,8 @@ export function searchPanel(ctx: ScreenContext, loc: Location): HTMLElement {
         const score = progressScore(p);
         return h(
           'div',
-          { class: 'search-summary' },
+          // Acabou de concluir nesta renderização: o resultado entra com animação.
+          { class: `search-summary${fx?.completed ? ' rise' : ''}` },
           h('p', { class: 'search-stars', 'aria-label': `${searchStars(score)} de 5 estrelas` }, stars(searchStars(score))),
           h(
             'p',
@@ -246,5 +295,7 @@ export function searchPanel(ctx: ScreenContext, loc: Location): HTMLElement {
     h('div', { class: 'search-stage' }, root, overlay),
     sideBar,
     summary,
+    // Leitores de tela ouvem o resultado de cada clique.
+    h('p', { class: 'sr-only', 'aria-live': 'polite', role: 'status' }, announcement),
   );
 }

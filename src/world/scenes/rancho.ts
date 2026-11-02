@@ -54,6 +54,8 @@ export interface SceneBuild {
   update(time: number, dt: number): void;
   /** Gráficos alto/baixo: sombras da lamparina e densidade do capim. */
   setQuality(high: boolean): void;
+  /** Brilho que se expande e some sobre um objeto recém-registrado. */
+  celebrate(id: ObjectId): void;
 }
 
 /** Raio do jogador para as colisões, o mesmo usado em index.ts. */
@@ -333,7 +335,9 @@ export function buildRancho(getPlayer: () => Vec2, session: ExploreSession, text
   /* ---------- Objetos da busca ---------- */
 
   const glintTex = glintTexture();
-  const props: { id: ObjectId; glint: THREE.Sprite; baseY: number; phase: number }[] = [];
+  /** `burst`: segundos restantes da explosão de brilho de um objeto recém-registrado. */
+  const props: { id: ObjectId; glint: THREE.Sprite; baseY: number; phase: number; burst: number }[] = [];
+  const BURST = 0.7;
   let lampFlame: THREE.MeshStandardMaterial | undefined;
   for (const id of session.targets) {
     const spot = SEARCH_SPOTS[id];
@@ -346,7 +350,7 @@ export function buildRancho(getPlayer: () => Vec2, session: ExploreSession, text
     const glint = createGlint(glintTex);
     glint.position.set(spot.x, spot.y + 0.14, spot.z);
     root.add(glint);
-    props.push({ id, glint, baseY: spot.y + 0.14, phase: props.length * 1.7 });
+    props.push({ id, glint, baseY: spot.y + 0.14, phase: props.length * 1.7, burst: 0 });
   }
 
   // A luz da lamparina ilumina a sala; uma segunda luz, fora, representa a
@@ -539,6 +543,10 @@ export function buildRancho(getPlayer: () => Vec2, session: ExploreSession, text
     boundsRadius: 30,
     colliders: () => [...colliders, doorIsOpen ? doorOpen : doorClosed],
     interactables,
+    celebrate(id: ObjectId) {
+      const p = props.find((x) => x.id === id);
+      if (p) p.burst = BURST;
+    },
     setQuality(high: boolean) {
       lampLight.castShadow = high;
       vegetation.setDensity(high ? 1 : 0.4);
@@ -554,6 +562,16 @@ export function buildRancho(getPlayer: () => Vec2, session: ExploreSession, text
 
       // Brilho pulsante nos objetos ainda não registrados.
       for (const p of props) {
+        if (p.burst > 0) {
+          // Explosão: o brilho cresce e some em BURST segundos.
+          p.burst = Math.max(0, p.burst - dt);
+          const k = 1 - p.burst / BURST;
+          p.glint.visible = true;
+          p.glint.material.opacity = 1 - k;
+          p.glint.scale.setScalar(0.2 + k * 1.1);
+          p.glint.position.y = p.baseY + k * 0.15;
+          continue;
+        }
         const found = session.isFound(p.id);
         p.glint.visible = !found;
         if (found) continue;

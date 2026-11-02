@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import type { ObjectId } from '../engine/types';
 import { canvas } from '../ui/art/svg';
 import { placedObject } from '../ui/art/objects';
 import { notebook } from '../ui/components/diario';
@@ -163,10 +164,24 @@ export function mountWorld(container: HTMLElement, opts: WorldOptions): WorldHan
   // Contador da busca, no canto: o mesmo progresso da versão 2D.
   const counter = el('p', 'world-counter');
   counter.setAttribute('aria-live', 'polite');
+  // Retorno de um registro novo: o painel de exame cobre a cena na hora, então
+  // o pulso do contador e o brilho no objeto ficam para a volta ao jogo.
+  let shownCount = session.foundCount();
+  let pendingCelebration: ObjectId | null = null;
   const refreshCounter = () => {
     counter.textContent = session.isComplete()
       ? 'Busca concluída · J diário'
       : `Objetos ${session.foundCount()}/${session.targets.length} · J diário`;
+  };
+  const celebrate = () => {
+    if (session.foundCount() > shownCount) {
+      shownCount = session.foundCount();
+      counter.classList.remove('is-bumped');
+      void counter.offsetWidth; // reinicia a animação se ela ainda estiver rodando
+      counter.classList.add('is-bumped');
+    }
+    if (pendingCelebration) world.celebrate(pendingCelebration);
+    pendingCelebration = null;
   };
   refreshCounter();
   const overlay = el('div', 'world-overlay');
@@ -207,6 +222,7 @@ export function mountWorld(container: HTMLElement, opts: WorldOptions): WorldHan
       else if (mode === 'playing' && focused) {
         const shown = focused.use();
         refreshCounter();
+        if (shown?.find?.isNew && shown.object) pendingCelebration = shown.object;
         if (shown) showExamine(shown);
       }
     },
@@ -252,6 +268,7 @@ export function mountWorld(container: HTMLElement, opts: WorldOptions): WorldHan
     help.hidden = next !== 'playing';
     refreshControls();
     prompt.hidden = true;
+    if (next === 'playing') celebrate();
     if (next === 'playing' || next === 'examine') return;
     input.unlock();
     // Na abertura e na pausa o jogador não está buscando: o relógio para.
