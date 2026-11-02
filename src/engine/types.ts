@@ -445,4 +445,11 @@ export interface SearchProgress {
    * Ausente em saves antigos, que só tinham a versão 2D.
    */
   completedIn?: '2d' | '3d';
+  /**
+   * Relógio de tempo ativo (ver engine/search.ts). `activeMs` soma os trechos
+   * já encerrados; `runningSince` marca o início do trecho atual (ausente ou
+   * null = pausado). Opcionais: saves antigos continuam válidos.
+   */
+  activeMs?: number;
+  runningSince?: number | null;
 }

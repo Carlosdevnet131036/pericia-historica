@@ -214,8 +214,7 @@ export function mountWorld(container: HTMLElement, opts: WorldOptions): WorldHan
 
   const resume = async () => {
     await input.lock();
-    // O relógio da busca começa quando o jogador começa a explorar (se a cena
-    // não foi iniciada na versão 2D nem concluída).
+    // O relógio da busca começa (ou volta a rodar) quando o jogador explora.
     session.begin();
     setMode('playing');
     renderer.domElement.focus();
@@ -255,6 +254,8 @@ export function mountWorld(container: HTMLElement, opts: WorldOptions): WorldHan
     prompt.hidden = true;
     if (next === 'playing' || next === 'examine') return;
     input.unlock();
+    // Na abertura e na pausa o jogador não está buscando: o relógio para.
+    session.pause();
     const title = next === 'intro' ? opts.locationName : 'Pausa';
     const text =
       next === 'intro'
@@ -347,6 +348,14 @@ export function mountWorld(container: HTMLElement, opts: WorldOptions): WorldHan
     refreshControls();
   };
   document.addEventListener('pointerlockchange', onLockChange);
+
+  // Aba escondida: o relógio da busca para; de volta, só retoma se estava em jogo
+  // (exame e diário contam: ler faz parte da busca).
+  const onVisibility = () => {
+    if (document.visibilityState === 'hidden') session.pause();
+    else if (mode === 'playing' || mode === 'examine' || mode === 'journal') session.begin();
+  };
+  document.addEventListener('visibilitychange', onVisibility);
 
   /* ---------- Tamanho ---------- */
 
@@ -459,6 +468,8 @@ export function mountWorld(container: HTMLElement, opts: WorldOptions): WorldHan
 
   return {
     dispose() {
+      session.pause();
+      document.removeEventListener('visibilitychange', onVisibility);
       cancelAnimationFrame(frame);
       timer.dispose();
       post?.dispose();

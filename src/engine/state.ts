@@ -27,10 +27,23 @@ export function loadSaved(caseId: string): GameState | null {
     if (parsed.version !== 2 || parsed.caseId !== caseId) return null;
     // Campos novos ganham o valor padrão; assim um save antigo continua válido.
     const base = initialState(caseId);
-    return { ...base, ...parsed, lab: { ...base.lab, ...parsed.lab } };
+    return dropOrphanClocks({ ...base, ...parsed, lab: { ...base.lab, ...parsed.lab } });
   } catch {
     return null;
   }
+}
+
+/**
+ * Um relógio de busca "rodando" num save recém-carregado é órfão: a página
+ * anterior fechou sem pausá-lo (processo encerrado à força, por exemplo).
+ * Não há como saber quanto daquele trecho foi jogo, então ele é descartado,
+ * a favor do jogador. No fluxo normal, a saída da página pausa e soma o
+ * trecho antes de salvar.
+ */
+export function dropOrphanClocks(state: GameState): GameState {
+  const entries = Object.entries(state.search ?? {});
+  if (!entries.some(([, p]) => p.runningSince != null)) return state;
+  return { ...state, search: Object.fromEntries(entries.map(([id, p]) => [id, p.runningSince != null ? { ...p, runningSince: null } : p])) };
 }
 
 function save(state: GameState): void {

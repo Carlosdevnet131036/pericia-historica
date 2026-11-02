@@ -1,4 +1,21 @@
-import { EMPTY_SEARCH, HIT_RADIUS, SEARCH_H, SEARCH_W, hitTarget, layoutSearch, progressScore, searchScore, searchStars } from '../../engine/search';
+import type { Store } from '../../engine/state';
+import {
+  beginSearch,
+  EMPTY_SEARCH,
+  finishSearch,
+  HIT_RADIUS,
+  hitTarget,
+  isRunning,
+  layoutSearch,
+  pauseSearch,
+  progressScore,
+  resumeSearch,
+  SEARCH_H,
+  SEARCH_W,
+  searchElapsed,
+  searchScore,
+  searchStars,
+} from '../../engine/search';
 import type { Location, SearchProgress } from '../../engine/types';
 import { ALL_OBJECTS, OBJECT_NAMES, placedObject } from '../art/objects';
 import { scene } from '../art/scenes';
@@ -18,11 +35,58 @@ onCaseChange(() => {
 });
 
 // Um único relógio para todas as cenas: atualiza o texto sem redesenhar a tela.
+// O tempo mostrado é o tempo ativo (base acumulada + trecho atual).
 setInterval(() => {
-  document.querySelectorAll<HTMLElement>('.search-timer[data-start]').forEach((el) => {
-    el.textContent = formatTime(Date.now() - Number(el.dataset.start));
+  document.querySelectorAll<HTMLElement>('.search-timer[data-base]').forEach((el) => {
+    const since = el.dataset.since ? Number(el.dataset.since) : null;
+    el.textContent = formatTime(Number(el.dataset.base) + (since !== null ? Math.max(0, Date.now() - since) : 0));
   });
 }, 500);
+
+/* ---------- Relógio de tempo ativo (ver engine/search.ts) ---------- */
+
+/** Cena de busca em andamento que está na tela nesta renderização. */
+let visibleScene: { store: Store; locId: string } | null = null;
+let syncing = false;
+
+/** Chamado por main.ts antes de cada renderização. */
+export function beginSearchRender(): void {
+  visibleScene = null;
+}
+
+/**
+ * Chamado depois de cada renderização e quando a aba aparece ou some: só o
+ * relógio da cena visível roda, e só com a aba à mostra. Grava apenas se algo
+ * mudou, então a renderização disparada por esta gravação não muda mais nada.
+ */
+export function syncSearchClocks(store: Store | null | undefined): void {
+  if (!store || syncing) return;
+  const now = Date.now();
+  const pageVisible = document.visibilityState === 'visible';
+  const st = store.get();
+  let changed = false;
+  const next = Object.fromEntries(
+    Object.entries(st.search).map(([id, p]) => {
+      const shouldRun = pageVisible && visibleScene?.store === store && visibleScene.locId === id;
+      const q = shouldRun ? resumeSearch(p, now) : pauseSearch(p, now);
+      if (q !== p) changed = true;
+      return [id, q];
+    }),
+  );
+  if (!changed) return;
+  syncing = true;
+  try {
+    store.update((s) => ({ ...s, search: next }));
+  } finally {
+    syncing = false;
+  }
+}
+
+/** Pausa todas as cenas (troca de rota, saída da página). */
+export function pauseAllSearches(store: Store | null | undefined): void {
+  visibleScene = null;
+  syncSearchClocks(store);
+}
 
 function formatTime(ms: number): string {
   const sec = Math.floor(ms / 1000);
@@ -47,6 +111,7 @@ export function searchPanel(ctx: ScreenContext, loc: Location): HTMLElement {
   const placements = layoutSearch(spec.seed, spec.targets, ALL_OBJECTS, spec.clutter);
   const started = p.startedAt !== null;
   const done = p.elapsedMs !== null;
+  if (started && !done) visibleScene = { store, locId: loc.id };
 
   const save = (next: Partial<SearchProgress>) =>
     store.update((st) => ({ ...st, search: { ...st.search, [loc.id]: { ...(st.search[loc.id] ?? EMPTY), ...next } } }));
@@ -94,9 +159,9 @@ export function searchPanel(ctx: ScreenContext, loc: Location): HTMLElement {
         save({ found });
         return;
       }
-      const elapsedMs = Date.now() - (p.startedAt ?? Date.now());
-      const score = searchScore(elapsedMs / 1000, p.misclicks, p.hints);
-      save({ found, elapsedMs, completedIn: '2d', bestStars: Math.max(p.bestStars, searchStars(score)) });
+      const done = finishSearch({ ...p, found }, Date.now(), '2d');
+      const score = searchScore((done.elapsedMs ?? 0) / 1000, p.misclicks, p.hints);
+      save({ ...done, bestStars: Math.max(p.bestStars, searchStars(score)) });
       // Completar a cena conta como visitar o lugar.
       store.update((st) => (st.visited.includes(loc.id) ? st : { ...st, visited: [...st.visited, loc.id] }));
     });
@@ -125,7 +190,11 @@ export function searchPanel(ctx: ScreenContext, loc: Location): HTMLElement {
       ? h(
           'div',
           { class: 'search-stats' },
-          h('span', { class: 'search-timer', 'data-start': String(p.startedAt) }, formatTime(Date.now() - (p.startedAt ?? Date.now()))),
+          h(
+            'span',
+            { class: 'search-timer', 'data-base': String(p.activeMs ?? 0), 'data-since': isRunning(p) ? String(p.runningSince) : undefined },
+            formatTime(searchElapsed(p, Date.now())),
+          ),
           h('span', {}, `Erros: ${p.misclicks}`),
           h('button', { class: 'btn ghost', onclick: hint }, 'Dica (−120)'),
         )
@@ -137,7 +206,7 @@ export function searchPanel(ctx: ScreenContext, loc: Location): HTMLElement {
         'div',
         { class: 'search-overlay' },
         h('p', {}, 'Ache os objetos da lista o mais rápido que puder. Cliques errados e dicas custam pontos.'),
-        h('button', { class: 'btn primary', onclick: () => save({ startedAt: Date.now() }) }, p.bestStars ? 'Investigar de novo' : 'Iniciar busca'),
+        h('button', { class: 'btn primary', onclick: () => save(beginSearch(p, Date.now())) }, p.bestStars ? 'Investigar de novo' : 'Iniciar busca'),
       )
     : null;
 
@@ -162,7 +231,7 @@ export function searchPanel(ctx: ScreenContext, loc: Location): HTMLElement {
               class: 'btn ghost',
               onclick: () => {
                 hintTarget = null;
-                save({ found: [], misclicks: 0, hints: 0, startedAt: null, elapsedMs: null, completedIn: undefined });
+                save({ found: [], misclicks: 0, hints: 0, startedAt: null, elapsedMs: null, completedIn: undefined, activeMs: undefined, runningSince: undefined });
               },
             },
             'Jogar a cena de novo',

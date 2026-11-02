@@ -1,4 +1,4 @@
-import { beginSearch, EMPTY_SEARCH, progressScore, registerFind, searchStars, unlockedEvidence } from '../engine/search';
+import { beginSearch, EMPTY_SEARCH, pauseSearch, progressScore, registerFind, resumeSearch, searchStars, unlockedEvidence } from '../engine/search';
 import type { Store } from '../engine/state';
 import type { CaseFile, Evidence, GameState, Location, ObjectId, SearchProgress } from '../engine/types';
 
@@ -18,8 +18,10 @@ export interface ExploreSession {
   foundCount(): number;
   /** A cena deste lugar está concluída (os cartões dele estão liberados). */
   isComplete(): boolean;
-  /** Liga o relógio da cena, se ainda não estiver ligado. */
+  /** Liga o relógio da cena, se ainda não estiver ligado, ou o retoma. */
   begin(): void;
+  /** Pausa o relógio (pausa do jogo, aba escondida, saída do 3D). */
+  pause(): void;
   find(id: ObjectId): FindOutcome;
   /** Cartões deste lugar (para a mancha no marco, por exemplo). */
   evidence(id: string): Evidence | undefined;
@@ -54,7 +56,13 @@ export function createSession(store: Store, caseFile: CaseFile, location: Locati
     isComplete: () => progress().elapsedMs !== null,
     begin() {
       const p = progress();
-      const next = beginSearch(p, Date.now());
+      const now = Date.now();
+      const next = resumeSearch(beginSearch(p, now), now);
+      if (next !== p) save(next);
+    },
+    pause() {
+      const p = progress();
+      const next = pauseSearch(p, Date.now());
       if (next !== p) save(next);
     },
     find(id) {

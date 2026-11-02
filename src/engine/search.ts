@@ -114,10 +114,47 @@ export function progressScore(p: SearchProgress): number {
 
 export const EMPTY_SEARCH: SearchProgress = { found: [], misclicks: 0, hints: 0, startedAt: null, elapsedMs: null, bestStars: 0 };
 
+/* ---------- Relógio de tempo ativo ---------- */
+
+/*
+ * O tempo da busca só conta enquanto o jogador está de fato nela: a cena
+ * visível, a aba à mostra, o 3D sem pausa. Antes, o tempo era "agora menos o
+ * início" e uma busca começada à noite e terminada de manhã dava 1 estrela.
+ *
+ *   elapsed = activeMs + (runningSince ? agora − runningSince : 0)
+ *
+ * Um save antigo de busca em andamento (sem os campos novos) fica pausado com
+ * tempo zero: o tempo gravado nele incluía as horas com o jogo fechado.
+ */
+
+export const isRunning = (p: SearchProgress): boolean => p.runningSince != null;
+
+export function searchElapsed(p: SearchProgress, now: number): number {
+  return (p.activeMs ?? 0) + (p.runningSince != null ? Math.max(0, now - p.runningSince) : 0);
+}
+
 /** Liga o relógio da cena, se ainda não estiver ligado nem concluída. */
 export function beginSearch(p: SearchProgress, now: number): SearchProgress {
   if (p.startedAt !== null || p.elapsedMs !== null) return p;
-  return { ...p, startedAt: now };
+  return { ...p, startedAt: now, activeMs: 0, runningSince: now };
+}
+
+/** Pausa o relógio, somando o trecho atual. Sem efeito se já está pausado. */
+export function pauseSearch(p: SearchProgress, now: number): SearchProgress {
+  if (p.runningSince == null) return p;
+  return { ...p, activeMs: searchElapsed(p, now), runningSince: null };
+}
+
+/** Retoma o relógio de uma cena começada e não concluída. */
+export function resumeSearch(p: SearchProgress, now: number): SearchProgress {
+  if (p.startedAt === null || p.elapsedMs !== null || p.runningSince != null) return p;
+  return { ...p, runningSince: now };
+}
+
+/** Encerra a cena: o tempo final é o tempo ativo, e o relógio para. */
+export function finishSearch(p: SearchProgress, now: number, completedIn: '2d' | '3d'): SearchProgress {
+  const elapsedMs = searchElapsed(p, now);
+  return { ...p, elapsedMs, activeMs: elapsedMs, runningSince: null, completedIn };
 }
 
 export interface FindResult {
@@ -137,8 +174,7 @@ export function registerFind(p: SearchProgress, targets: readonly ObjectId[], id
   const started = beginSearch(p, now);
   const found = [...started.found, id];
   if (found.length < targets.length) return { progress: { ...started, found }, isNew: true, completed: false };
-  const elapsedMs = now - (started.startedAt ?? now);
-  const done: SearchProgress = { ...started, found, elapsedMs, completedIn: '3d' };
+  const done = finishSearch({ ...started, found }, now, '3d');
   return { progress: { ...done, bestStars: Math.max(p.bestStars, searchStars(progressScore(done))) }, isNew: true, completed: true };
 }
 
