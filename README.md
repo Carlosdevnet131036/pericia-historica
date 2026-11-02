@@ -36,8 +36,12 @@ Requer Node.js 18 ou superior.
 npm install
 npm run dev        # http://localhost:5173
 npm test           # testes unitários (Vitest)
+npm run e2e        # testes de navegador (Playwright; sobe o servidor sozinho)
+npm run typecheck  # tipos do jogo e dos testes de navegador
 npm run build      # typecheck + build de produção em dist/
 ```
+
+Os testes de navegador precisam do Chromium do Playwright: `npx playwright install --with-deps chromium` na primeira vez.
 
 ## Modo 3D (protótipo, em desenvolvimento)
 
@@ -70,7 +74,10 @@ A cada push na `main` e em todo pull request, o GitHub Actions (`.github/workflo
 |-----|----------------|--------------|
 | `verificar` (Node 22 e 24) | `npm ci`, typecheck, testes e build | Erro de tipo, teste quebrado ou build com erro |
 | `auditoria` | `npm audit --audit-level=high` | Vulnerabilidade alta ou crítica nas dependências |
-| `publicar` (só na `main`) | Publica `dist/` no GitHub Pages | Roda apenas se os dois jobs acima passarem |
+| `e2e` | Testes de navegador (Playwright, Chromium com WebGL por software) | Fluxo quebrado no navegador ou exceção na página |
+| `publicar` (só na `main`) | Publica `dist/` no GitHub Pages | Roda apenas se os três jobs acima passarem |
+
+Relatórios de auditoria e de validação de cada grupo de melhorias ficam em [`docs/`](docs/README.md).
 
 O build do Node 22 fica disponível por 7 dias como artefato `dist` na página da execução. O Dependabot (`.github/dependabot.yml`) abre PRs semanais com atualizações, e cada PR passa pelo mesmo pipeline antes do merge.
 

@@ -1936,6 +1936,8 @@ a.case-card:hover {
   position: absolute;
   top: calc(14px + env(safe-area-inset-top, 0px));
   left: max(16px, env(safe-area-inset-left, 0px));
+  /* Deixa espaço para o contador no canto direito (em telas estreitas, quebra a linha). */
+  max-width: calc(100% - 220px);
   pointer-events: none;
   text-shadow: 0 1px 3px rgb(0 0 0 / 0.8);
 }
@@ -2447,4 +2449,150 @@ a.case-card:hover {
   box-shadow: none;
   padding: 0;
   width: min(1100px, 100%);
+}
+
+/* Botões de pausa e saída durante o jogo 3D, no canto inferior direito. */
+.world-controls {
+  position: absolute;
+  right: max(16px, env(safe-area-inset-right, 0px));
+  bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  gap: 8px;
+}
+
+.world-controls .btn {
+  background: rgb(11 16 24 / 0.7);
+  font-size: 0.85rem;
+  padding: 6px 12px;
+}
+
+.explore3d-note {
+  border-left: 3px solid var(--rule);
+  padding-left: 10px;
+}
+
+/* ---------- Retorno da busca: achado e erro ---------- */
+
+/* Texto só para leitores de tela (anúncio de cada clique na busca). */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Achado: o objeto "salta" antes de esmaecer. A propriedade `scale` soma-se
+   ao transform de posição do grupo SVG, sem substituí-lo. */
+.search .obj.just-found {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: found-pop 0.5s ease-out;
+}
+
+@keyframes found-pop {
+  0% {
+    scale: 1;
+    opacity: 1;
+  }
+  35% {
+    scale: 1.35;
+    opacity: 1;
+  }
+  100% {
+    scale: 1;
+  }
+}
+
+/* Círculo de tinta desenhado em volta do achado, como uma marcação de perito. */
+.found-ring {
+  fill: none;
+  stroke: var(--ok);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: ink-draw 0.45s ease-out forwards, fade-out 0.6s ease 1.1s forwards;
+}
+
+.found-float {
+  fill: var(--ok);
+  font: 600 18px var(--font-type);
+  paint-order: stroke;
+  stroke: var(--paper);
+  stroke-width: 4px;
+  animation: float-up 1.4s ease-out forwards;
+}
+
+.miss-cost {
+  fill: var(--blood);
+  font: 700 18px var(--font-type);
+  paint-order: stroke;
+  stroke: var(--paper);
+  stroke-width: 4px;
+  animation: float-up 0.9s ease-out forwards;
+}
+
+@keyframes float-up {
+  from {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(-22px);
+    opacity: 0;
+  }
+}
+
+/* Item da lista recém-riscado e contador de erros recém-aumentado. */
+.search-list li.just-found {
+  animation: list-flash 1s ease-out;
+}
+
+@keyframes list-flash {
+  from {
+    background: color-mix(in srgb, var(--ok) 28%, transparent);
+  }
+  to {
+    background: transparent;
+  }
+}
+
+.search-misses.just-missed {
+  color: var(--blood);
+  font-weight: 700;
+}
+
+/* 3D: o contador pulsa quando um objeto é registrado. */
+.world-counter.is-bumped {
+  animation: counter-bump 0.6s ease-out;
+}
+
+@keyframes counter-bump {
+  30% {
+    transform: scale(1.18);
+    color: #f0d48a;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .search .obj.just-found,
+  .found-float,
+  .miss-cost,
+  .world-counter.is-bumped {
+    animation: none;
+  }
+  /* Sem movimento, o círculo aparece pronto e fica como destaque estático. */
+  .found-ring {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+  .search-list li.just-found {
+    animation: none;
+    background: color-mix(in srgb, var(--ok) 18%, transparent);
+  }
 }

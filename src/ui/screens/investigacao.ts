@@ -1,6 +1,7 @@
 import type { Evidence } from '../../engine/types';
 import { scene } from '../art/scenes';
 import { drawIn } from '../art/svg';
+import { isTouchOnly } from '../device';
 import { h } from '../dom';
 import { firstTime, onCaseChange } from '../view-state';
 import { evidenceCard, suspectsBoard } from '../components/caso';
@@ -83,11 +84,13 @@ export const investigacao: Screen = (ctx) => {
           : current.search
             ? [
                 current.explore3d
-                  ? h(
-                      'a',
-                      { class: 'btn ghost explore3d', href: `#${c.id}/3d` },
-                      'Explorar este lugar em 3D (protótipo, computador com teclado e mouse)',
-                    )
+                  ? isTouchOnly()
+                    ? h('p', { class: 'caption explore3d-note' }, 'Há uma versão 3D deste lugar, mas ela precisa de teclado e mouse. Neste aparelho, a busca abaixo é a versão completa.')
+                    : h(
+                        'a',
+                        { class: 'btn ghost explore3d', href: `#${c.id}/3d` },
+                        'Explorar este lugar em 3D (protótipo, computador com teclado e mouse)',
+                      )
                   : null,
                 searchPanel(ctx, current),
                 ...(searchDone ? cards : []),

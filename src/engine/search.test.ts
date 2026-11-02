@@ -1,7 +1,22 @@
 import { describe, expect, it } from 'vitest';
 import { CASES } from '../cases';
 import { rojas1892 } from '../cases/rojas1892';
-import { beginSearch, EMPTY_SEARCH, HIT_RADIUS, hitTarget, layoutSearch, progressScore, registerFind, searchScore, searchStars, unlockedEvidence } from './search';
+import {
+  beginSearch,
+  EMPTY_SEARCH,
+  HIT_RADIUS,
+  hitTarget,
+  isRunning,
+  layoutSearch,
+  pauseSearch,
+  progressScore,
+  registerFind,
+  resumeSearch,
+  searchElapsed,
+  searchScore,
+  searchStars,
+  unlockedEvidence,
+} from './search';
 import { initialState } from './state';
 import type { ObjectId } from './types';
 
@@ -114,7 +129,8 @@ describe('progresso compartilhado entre a busca 2D e a exploração 3D', () => {
   });
 
   it('o recorde de estrelas nunca diminui', () => {
-    let p: typeof EMPTY_SEARCH = { ...EMPTY_SEARCH, startedAt: 0, bestStars: 5 };
+    // Uma partida lenta (10 min de tempo ativo) depois de um recorde de 5 estrelas.
+    let p: typeof EMPTY_SEARCH = { ...beginSearch(EMPTY_SEARCH, 0), bestStars: 5 };
     for (const id of targets) p = registerFind(p, targets, id, 600_000).progress;
     expect(p.bestStars).toBe(5);
     expect(searchStars(progressScore(p))).toBe(1);
@@ -137,5 +153,56 @@ describe('progresso compartilhado entre a busca 2D e a exploração 3D', () => {
     expect(unlockedEvidence(rojas1892, s).map((e) => e.id)).toEqual([]);
     const done = { ...s, search: { rancho: { ...EMPTY_SEARCH, elapsedMs: 1 } } };
     expect(unlockedEvidence(rojas1892, done).map((e) => e.id)).toEqual(['cena', 'mancha']);
+  });
+});
+
+describe('relógio da busca: só conta tempo ativo', () => {
+  const targets = rojas1892.locations.find((l) => l.id === 'rancho')!.search!.targets;
+
+  it('começar liga o relógio; o tempo cresce enquanto roda', () => {
+    const p = beginSearch(EMPTY_SEARCH, 1000);
+    expect(p.startedAt).toBe(1000);
+    expect(isRunning(p)).toBe(true);
+    expect(searchElapsed(p, 4000)).toBe(3000);
+  });
+
+  it('pausado, o tempo não anda; ao retomar, continua de onde parou', () => {
+    let p = beginSearch(EMPTY_SEARCH, 0);
+    p = pauseSearch(p, 10_000); // 10 s jogando
+    expect(isRunning(p)).toBe(false);
+    expect(searchElapsed(p, 3_600_000)).toBe(10_000); // uma hora fora não conta
+    p = resumeSearch(p, 3_600_000);
+    expect(searchElapsed(p, 3_605_000)).toBe(15_000);
+  });
+
+  it('pausar ou retomar duas vezes não muda nada (idempotente)', () => {
+    const running = beginSearch(EMPTY_SEARCH, 0);
+    expect(resumeSearch(running, 50)).toBe(running);
+    const paused = pauseSearch(running, 100);
+    expect(pauseSearch(paused, 900)).toBe(paused);
+  });
+
+  it('não retoma uma cena que não começou nem uma concluída', () => {
+    expect(resumeSearch(EMPTY_SEARCH, 10)).toBe(EMPTY_SEARCH);
+    const done = { ...EMPTY_SEARCH, startedAt: 0, elapsedMs: 5000 };
+    expect(resumeSearch(done, 10)).toBe(done);
+  });
+
+  it('a conclusão usa o tempo ativo, não o horário de início', () => {
+    let p = beginSearch(EMPTY_SEARCH, 0);
+    for (const id of targets.slice(0, 7)) p = registerFind(p, targets, id, 1000).progress;
+    p = pauseSearch(p, 20_000); // 20 s jogando, depois a aba fica escondida por um dia
+    p = resumeSearch(p, 86_400_000);
+    const last = registerFind(p, targets, targets[7]!, 86_400_000 + 10_000);
+    expect(last.completed).toBe(true);
+    expect(last.progress.elapsedMs).toBe(30_000);
+    expect(isRunning(last.progress)).toBe(false);
+  });
+
+  it('save antigo (sem os campos novos) fica pausado com tempo zero, a favor do jogador', () => {
+    const legacy = { ...EMPTY_SEARCH, startedAt: 1, found: ['chave'] };
+    expect(isRunning(legacy)).toBe(false);
+    expect(searchElapsed(legacy, 999_999_999)).toBe(0);
+    expect(isRunning(resumeSearch(legacy, 5))).toBe(true);
   });
 });

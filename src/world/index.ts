@@ -1,7 +1,9 @@
 import * as THREE from 'three';
+import type { ObjectId } from '../engine/types';
 import { canvas } from '../ui/art/svg';
 import { placedObject } from '../ui/art/objects';
 import { notebook } from '../ui/components/diario';
+import { isTouchOnly } from '../ui/device';
 import { h } from '../ui/dom';
 import { cameraDistance, resolveCircle } from './collision';
 import { Input } from './input';
@@ -162,17 +164,43 @@ export function mountWorld(container: HTMLElement, opts: WorldOptions): WorldHan
   // Contador da busca, no canto: o mesmo progresso da versão 2D.
   const counter = el('p', 'world-counter');
   counter.setAttribute('aria-live', 'polite');
+  // Retorno de um registro novo: o painel de exame cobre a cena na hora, então
+  // o pulso do contador e o brilho no objeto ficam para a volta ao jogo.
+  let shownCount = session.foundCount();
+  let pendingCelebration: ObjectId | null = null;
   const refreshCounter = () => {
     counter.textContent = session.isComplete()
       ? 'Busca concluída · J diário'
       : `Objetos ${session.foundCount()}/${session.targets.length} · J diário`;
+  };
+  const celebrate = () => {
+    if (session.foundCount() > shownCount) {
+      shownCount = session.foundCount();
+      counter.classList.remove('is-bumped');
+      void counter.offsetWidth; // reinicia a animação se ela ainda estiver rodando
+      counter.classList.add('is-bumped');
+    }
+    if (pendingCelebration) world.celebrate(pendingCelebration);
+    pendingCelebration = null;
   };
   refreshCounter();
   const overlay = el('div', 'world-overlay');
   const card = el('div', 'world-card');
   card.setAttribute('role', 'dialog');
   overlay.append(card);
-  container.append(hud, counter, help, prompt, overlay);
+  // Saídas durante o jogo. Com o mouse capturado (pointer lock) o cursor some
+  // e o navegador entrega todo clique ao canvas: a saída é o Esc. Sem captura
+  // (navegador recusou, ou arrastar para olhar), aparecem estes botões.
+  const controls = el('div', 'world-controls');
+  const pauseBtn = el('button', 'btn ghost world-pause', 'Pausa (Esc)');
+  pauseBtn.type = 'button';
+  pauseBtn.addEventListener('click', () => {
+    if (mode === 'playing') setMode('paused');
+  });
+  const exitLink = el('a', 'btn ghost world-exit', 'Sair do 3D');
+  exitLink.href = opts.backHref;
+  controls.append(pauseBtn, exitLink);
+  container.append(hud, counter, help, prompt, controls, overlay);
 
   let mode: Mode = 'intro';
   let focused: SceneInteractable | null = null;
@@ -194,6 +222,7 @@ export function mountWorld(container: HTMLElement, opts: WorldOptions): WorldHan
       else if (mode === 'playing' && focused) {
         const shown = focused.use();
         refreshCounter();
+        if (shown?.find?.isNew && shown.object) pendingCelebration = shown.object;
         if (shown) showExamine(shown);
       }
     },
@@ -201,12 +230,21 @@ export function mountWorld(container: HTMLElement, opts: WorldOptions): WorldHan
 
   const resume = async () => {
     await input.lock();
-    // O relógio da busca começa quando o jogador começa a explorar (se a cena
-    // não foi iniciada na versão 2D nem concluída).
+    // O relógio da busca começa (ou volta a rodar) quando o jogador explora.
     session.begin();
     setMode('playing');
     renderer.domElement.focus();
   };
+
+  /** Só a volta ao caso, em destaque (aparelhos sem teclado e mouse). */
+  function backOnly(): HTMLDivElement {
+    const back = el('a', 'btn primary', 'Voltar à versão 2D');
+    back.href = opts.backHref;
+    const row = el('div', 'world-actions');
+    row.append(back);
+    queueMicrotask(() => back.focus());
+    return row;
+  }
 
   function actions(primary: string): HTMLDivElement {
     const go = el('button', 'btn primary', primary);
@@ -219,13 +257,22 @@ export function mountWorld(container: HTMLElement, opts: WorldOptions): WorldHan
     return row;
   }
 
+  /** Botões de pausa e saída: só no jogo e só sem o mouse capturado. */
+  function refreshControls(): void {
+    controls.hidden = mode !== 'playing' || input.locked;
+  }
+
   function setMode(next: Mode): void {
     mode = next;
     overlay.hidden = next === 'playing';
     help.hidden = next !== 'playing';
+    refreshControls();
     prompt.hidden = true;
+    if (next === 'playing') celebrate();
     if (next === 'playing' || next === 'examine') return;
     input.unlock();
+    // Na abertura e na pausa o jogador não está buscando: o relógio para.
+    session.pause();
     const title = next === 'intro' ? opts.locationName : 'Pausa';
     const text =
       next === 'intro'
@@ -242,6 +289,17 @@ export function mountWorld(container: HTMLElement, opts: WorldOptions): WorldHan
       applyQuality();
       quality.textContent = `Gráficos: ${high ? 'alto' : 'baixo'}`;
     });
+    if (next === 'intro' && isTouchOnly()) {
+      // Sem teclado e mouse não há como andar nem olhar: em vez de deixar o
+      // jogador preso numa tela sem controles, a abertura só oferece a volta.
+      card.className = 'world-card world-touch';
+      card.replaceChildren(
+        el('h2', '', title),
+        el('p', '', 'O modo 3D ainda precisa de teclado e mouse, e este aparelho usa toque. O caso inteiro, inclusive a busca neste lugar, está na versão 2D.'),
+        backOnly(),
+      );
+      return;
+    }
     card.replaceChildren(el('h2', '', title), el('p', '', text), actions(next === 'intro' ? 'Explorar' : 'Continuar'), quality);
   }
 
@@ -293,6 +351,7 @@ export function mountWorld(container: HTMLElement, opts: WorldOptions): WorldHan
     input.unlock();
     overlay.hidden = false;
     help.hidden = true;
+    refreshControls();
     prompt.hidden = true;
     card.className = cls;
   }
@@ -303,8 +362,17 @@ export function mountWorld(container: HTMLElement, opts: WorldOptions): WorldHan
   // está solto de propósito, então não conta.
   const onLockChange = () => {
     if (!input.locked && mode === 'playing') setMode('paused');
+    refreshControls();
   };
   document.addEventListener('pointerlockchange', onLockChange);
+
+  // Aba escondida: o relógio da busca para; de volta, só retoma se estava em jogo
+  // (exame e diário contam: ler faz parte da busca).
+  const onVisibility = () => {
+    if (document.visibilityState === 'hidden') session.pause();
+    else if (mode === 'playing' || mode === 'examine' || mode === 'journal') session.begin();
+  };
+  document.addEventListener('visibilitychange', onVisibility);
 
   /* ---------- Tamanho ---------- */
 
@@ -417,6 +485,8 @@ export function mountWorld(container: HTMLElement, opts: WorldOptions): WorldHan
 
   return {
     dispose() {
+      session.pause();
+      document.removeEventListener('visibilitychange', onVisibility);
       cancelAnimationFrame(frame);
       timer.dispose();
       post?.dispose();

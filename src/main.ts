@@ -14,6 +14,7 @@ import { treino } from './ui/screens/treino';
 import { caseChanged, firstTime } from './ui/view-state';
 import { partnerBubble } from './ui/components/caso';
 import { notebook } from './ui/components/diario';
+import { beginSearchRender, pauseAllSearches, syncSearchClocks } from './ui/modules/busca';
 
 const SCREENS: Record<Step, Screen> = { expediente, investigacao, treino, laboratorio, acusacao, revelacao };
 
@@ -57,6 +58,7 @@ function stepper(store: Store, step: Step, reached: Step[]): HTMLElement {
 
 function render(): void {
   const focusedId = document.activeElement?.id;
+  beginSearchRender();
   let header: HTMLElement;
   let body: HTMLElement;
   let view: string;
@@ -97,6 +99,8 @@ function render(): void {
     window.scrollTo({ top: 0 });
     lastView = view;
   }
+  // Só o relógio da cena de busca que ficou na tela continua rodando.
+  syncSearchClocks(current?.store);
 }
 
 /**
@@ -137,6 +141,8 @@ function stamp(view: string): void {
  */
 function route(): void {
   const [id = '', mode] = location.hash.slice(1).split('/');
+  // Sair de uma tela do caso pausa o relógio das buscas (e grava o tempo).
+  pauseAllSearches(current?.store);
   world?.dispose();
   world = null;
   const caseFile = findCase(id);
@@ -207,4 +213,11 @@ async function open3d(caseFile: CaseFile): Promise<void> {
 }
 
 window.addEventListener('hashchange', route);
+// Aba escondida ou página fechada: pausa e grava; aba de volta: retoma a cena visível.
+document.addEventListener('visibilitychange', () => syncSearchClocks(current?.store));
+window.addEventListener('pagehide', () => pauseAllSearches(current?.store));
+// Página restaurada do cache de navegação: redesenha para a cena visível retomar.
+window.addEventListener('pageshow', (e) => {
+  if (e.persisted && current) render();
+});
 route();
