@@ -57,6 +57,7 @@ Teste alterado: "o recorde de estrelas nunca diminui" montava uma busca em andam
 | `npm run e2e` | **24/24** |
 | `npx playwright test --repeat-each=3` | **72/72**, sem instabilidade |
 | `npm run build` | OK: 2D 56,42 KB gz (+0,9); 3D 164,30 KB gz (+0,3) |
+| CI na branch (41537749425, após as correções) | `verificar` (Node 22 e 24), `auditoria` e `e2e` aprovados; `publicar` pulado (fora da main) |
 
 ### Falhas encontradas durante o trabalho e causa
 
@@ -65,6 +66,19 @@ Teste alterado: "o recorde de estrelas nunca diminui" montava uma busca em andam
 3. **Clique no pente** (teste): o centro do desenho cai num vão entre os dentes. O jogo decide o acerto pela distância (ouvinte no `<svg>` inteiro, conferido no código); o teste passou a clicar na posição, como o jogador.
 4. **Ponto vazio na cena** (teste): margem de 40 px grande demais para 28 objetos; reduzida para 14 px (o raio de acerto fica dentro da caixa + 12 px).
 5. **Texto "Chave ✓" cortado** na borda de cima (captura de tela): textos flutuantes passaram a se ajustar às bordas.
+
+## Incidentes no CI (não causados por este grupo)
+
+A primeira execução no CI (41537162867) falhou em dois jobs que passavam no grupo 1:
+
+| Job | Causa | Evidência | Correção |
+|---|---|---|---|
+| `auditoria` | Alertas de segurança publicados depois do grupo 1: vite 7.3.6 (alta) e vitest 4.1.11 (moderadas) | `npm audit` local reproduziu | vite 7.3.7 e vitest 4.1.12 (correções da mesma linha, publicadas há mais de duas semanas); `npm audit`: 0 vulnerabilidades |
+| `e2e` | Etapa "Instalar o Chromium do Playwright" falhou; o `ubuntu-latest` migrou para o Ubuntu 26 em 19/10/2026, que o Playwright 1.56 não suporta no `--with-deps` | Aviso de migração nas anotações do job; o log completo não pôde ser lido daqui (armazenamento fora da rede liberada) | Job `e2e` fixado em `ubuntu-24.04`; na execução seguinte (41537749425) a instalação passou em 16 s e os testes passaram |
+
+**Consequência para o PR #5 (grupo 1):** sozinho, ele falharia hoje nos mesmos dois jobs. Estas correções estão nesta branch.
+
+Ainda pendente (aviso, não erro): as actions `checkout`, `setup-node` e `upload-artifact` na versão 4 rodam em Node 20, que o GitHub está descontinuando. Atualizar em um grupo à parte.
 
 ## Limitações da validação
 
