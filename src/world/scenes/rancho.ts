@@ -31,6 +31,7 @@ import { BENCH, DOOR_H, DOOR_X0, DOOR_X1, HOUSE_D, HOUSE_W, HOUSE_Z, INNER, QUAR
  */
 export interface ExamineInfo {
   object?: ObjectId;
+  visual?: 'door-stain';
   title: string;
   nature: 'dramatizado' | 'documentado';
   paragraphs: string[];
@@ -528,7 +529,7 @@ export function buildRancho(getPlayer: () => Vec2, session: ExploreSession, text
       use: () => {
         const card = session.evidence('mancha');
         if (!card) return;
-        return { title: card.title, nature: card.dramatized ? 'dramatizado' : 'documentado', paragraphs: card.paragraphs };
+        return { visual: 'door-stain', title: card.title, nature: card.dramatized ? 'dramatizado' : 'documentado', paragraphs: card.paragraphs };
       },
     },
   ];

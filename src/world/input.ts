@@ -35,6 +35,8 @@ export interface InputHandlers {
 const MAX_EVENT_DELTA = 250;
 
 export class Input {
+  /** Painéis mantêm atalhos de ação, mas liberam setas para os controles nativos. */
+  private movementEnabled = true;
   readonly move: MoveInput = { forward: false, back: false, left: false, right: false, run: false };
   /** Movimento do mouse acumulado desde a última leitura, em pixels. */
   private dx = 0;
@@ -82,7 +84,14 @@ export class Input {
   }
 
   unlock(): void {
+    this.releaseAll();
     if (this.locked) document.exitPointerLock();
+  }
+
+  setMovementEnabled(enabled: boolean): void {
+    this.movementEnabled = enabled;
+    this.releaseAll();
+    this.dx = this.dy = 0;
   }
 
   /** Lê e zera o movimento do mouse acumulado (em radianos já escalados). */
@@ -100,6 +109,7 @@ export class Input {
       if (down && !e.repeat) this.handlers[action]?.();
       return;
     }
+    if (!this.movementEnabled) return;
     e.preventDefault();
     this.move[action] = down;
   }
