@@ -58,6 +58,8 @@ Visual: noite verde-azulada com neblina, capim que balança ao vento (calculado 
 
 Diário: botão "Diário" no cabeçalho do caso (2D) ou tecla J (3D). É um caderno com as abas Caso, Evidências, Suspeitos e Objetos, que mostra só o que já foi liberado. Os retratos são ilustrações genéricas de época, não semelhanças.
 
+Exame em destaque: no 3D do Caso 1, E abre os objetos da busca e a mancha liberada no marco da porta. O painel mostra uma ilustração dramatizada ampliável de 100% a 250%, com rolagem e botão Restaurar. A mancha é uma representação genérica, sem reproduzir a prova original ou antecipar as minúcias do laboratório; o texto histórico conserva sua classificação Documentado. O jogador fica parado enquanto examina, pode consultar o diário e volta com E, Esc ou o botão. Tab permanece dentro do painel e as setas operam o controle de ampliação. Os registros e as condições de liberação continuam compartilhados com o modo 2D.
+
 Busca em 3D: os 8 objetos da busca do rancho estão na casa e no terreiro (posições dramatizadas; o quarto fica vazio). Examinar um objeto o registra no **mesmo progresso** da busca 2D (`state.search.rancho`), então o que se acha num modo vale no outro, sem duplicação. Com os 8, a cena é concluída, os cartões `cena` e `mancha` são liberados e a mancha aparece no marco da porta do quarto, examinável com o texto do cartão documentado. A pontuação da cena concluída em 3D usa outra fórmula (`exploreScore`: andar leva mais tempo que clicar; valores provisórios).
 
 Etapas: 1. personagem, câmera e cenário navegável (feito) · 2. colisões, câmera que não atravessa paredes, porta e lamparina examinável (feito) · 3. os 8 objetos da busca, o quarto com a mancha e o diário (feito) · 4. demais lugares e sistemas narrativos.

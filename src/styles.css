@@ -2036,8 +2036,23 @@ a.case-card:hover {
 }
 
 .world-examine {
-  max-width: 420px;
+  width: min(640px, 100%);
+  max-width: 640px;
 }
+
+.examination { margin: 0; min-width: 0; }
+.examination-viewport {
+  width: 100%;
+  height: clamp(180px, 32vh, 300px);
+  overflow: auto;
+  background: radial-gradient(ellipse at center, var(--sheet), var(--rule));
+  border: 1px solid var(--rule);
+}
+.examination-viewport .art { display: block; max-width: none; flex-shrink: 0; }
+.examination-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
+.examination-controls input { flex: 1; min-width: 90px; accent-color: var(--ink); }
+.examination-zoom { min-width: 4ch; font-variant-numeric: tabular-nums; }
+.examination figcaption { margin-top: 8px; font-size: 0.78rem; color: var(--ink-soft); }
 
 .world-examine-art {
   width: 160px;

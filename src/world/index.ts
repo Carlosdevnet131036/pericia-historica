@@ -1,6 +1,5 @@
 import * as THREE from 'three';
-import { canvas } from '../ui/art/svg';
-import { placedObject } from '../ui/art/objects';
+import { examination } from './examination';
 import { notebook } from '../ui/components/diario';
 import { h } from '../ui/dom';
 import { cameraDistance, resolveCircle } from './collision';
@@ -171,6 +170,8 @@ export function mountWorld(container: HTMLElement, opts: WorldOptions): WorldHan
   const overlay = el('div', 'world-overlay');
   const card = el('div', 'world-card');
   card.setAttribute('role', 'dialog');
+  card.setAttribute('aria-modal', 'true');
+  card.setAttribute('aria-label', 'Exploração do rancho');
   overlay.append(card);
   container.append(hud, counter, help, prompt, overlay);
 
@@ -178,10 +179,10 @@ export function mountWorld(container: HTMLElement, opts: WorldOptions): WorldHan
   let focused: SceneInteractable | null = null;
 
   const input = new Input(renderer.domElement, {
-    // Esc só pausa; para voltar, o jogador clica em "Continuar" (o navegador
-    // exige um gesto para capturar o mouse de novo).
+    // Em painéis Esc volta à exploração; em jogo abre a pausa.
     pause: () => {
-      if (mode === 'playing' || mode === 'examine' || mode === 'journal') setMode('paused');
+      if (mode === 'examine' || mode === 'journal') void resume();
+      else if (mode === 'playing') setMode('paused');
     },
     // J abre e fecha o diário.
     journal: () => {
@@ -221,6 +222,7 @@ export function mountWorld(container: HTMLElement, opts: WorldOptions): WorldHan
 
   function setMode(next: Mode): void {
     mode = next;
+    input.setMovementEnabled(next === 'playing');
     overlay.hidden = next === 'playing';
     help.hidden = next !== 'playing';
     prompt.hidden = true;
@@ -234,6 +236,7 @@ export function mountWorld(container: HTMLElement, opts: WorldOptions): WorldHan
           : `Reconstrução dramatizada de um rancho do pampa em 1892. Encontre e examine os ${session.targets.length} objetos da busca (E) para liberar os cartões deste lugar. O relógio começa quando você entra. O que achar aqui vale também na versão 2D.`
         : 'O jogo está pausado.';
     card.className = 'world-card';
+    card.setAttribute('aria-label', title);
     const quality = el('button', 'btn ghost world-quality', `Gráficos: ${high ? 'alto' : 'baixo'}`);
     quality.title = 'Baixo desliga brilho, gradação de cor e sombras da lamparina, e reduz o capim';
     quality.addEventListener('click', () => {
@@ -248,13 +251,10 @@ export function mountWorld(container: HTMLElement, opts: WorldOptions): WorldHan
   /** Painel de exame: o mouse é liberado para ler e clicar; E ou o botão voltam. */
   function showExamine(info: ExamineInfo): void {
     openPanel('examine', 'world-card world-examine');
+    card.setAttribute('aria-label', `Examinar: ${info.title}`);
     const parts: (HTMLElement | SVGElement)[] = [];
-    if (info.object) {
-      const art = canvas('-30 -30 60 60', info.title);
-      art.root.append(placedObject(info.object, art.hatch, 0, 0, 0, 1.15));
-      art.root.classList.add('world-examine-art');
-      parts.push(art.root);
-    }
+    const viewer = examination(info);
+    if (viewer) parts.push(viewer);
     parts.push(
       el('p', `world-nature${info.nature === 'documentado' ? ' is-doc' : ''}`, NATURE_LABEL[info.nature]),
       el('h2', '', info.title),
@@ -276,13 +276,16 @@ export function mountWorld(container: HTMLElement, opts: WorldOptions): WorldHan
     } else if (f) {
       parts.push(el('p', 'world-status', 'Já registrado no diário.'));
     }
-    parts.push(actions('Voltar à exploração (E)'));
+    const journal = el('button', 'btn ghost', 'Consultar o diário');
+    journal.addEventListener('click', showJournal);
+    parts.push(journal, actions('Voltar à exploração (E ou Esc)'));
     card.replaceChildren(...parts);
   }
 
   /** Diário em caderno, o mesmo componente da versão 2D. */
   function showJournal(): void {
     openPanel('journal', 'world-card world-notebook-host');
+    card.setAttribute('aria-label', 'Diário de investigação');
     card.replaceChildren(notebook(session.caseFile, session.state(), { initial: 'objetos', onClose: () => void resume(), closeLabel: 'Fechar o diário (J)' }));
     card.querySelector<HTMLElement>('.nb-tab.is-active')?.focus();
   }
@@ -290,12 +293,28 @@ export function mountWorld(container: HTMLElement, opts: WorldOptions): WorldHan
   /** Abre um painel que solta o mouse (exame, diário). */
   function openPanel(next: 'examine' | 'journal', cls: string): void {
     mode = next;
+    input.setMovementEnabled(false);
     input.unlock();
     overlay.hidden = false;
     help.hidden = true;
     prompt.hidden = true;
     card.className = cls;
   }
+
+  // Mantém Tab no painel, sem prender o teclado ao sair para a exploração.
+  card.addEventListener('keydown', (event) => {
+    if (event.key !== 'Tab' || overlay.hidden) return;
+    const controls = [...card.querySelectorAll<HTMLElement>('button:not(:disabled), a[href], input, [tabindex="0"]')];
+    const first = controls[0];
+    const last = controls[controls.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last?.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first?.focus();
+    }
+  });
 
   setMode('intro');
 
